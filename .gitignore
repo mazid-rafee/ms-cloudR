@@ -1,0 +1,18 @@
+# Ignore IDE files
+.vscode/
+checkpoints/
+
+# Ignore virtual environments
+venv/
+env/
+.cloudsen-env/
+__pycache__/
+*.pyc
+
+# Ignore large data and models
+data/raw/
+data/processed/
+data/
+work_dirs/
+src/results/*.pth
+results/*.pth
