@@ -37,8 +37,20 @@ class SEN12MSCRDataset(Dataset):
     def __getitem__(self, idx):
         s2c_path, s1_path, s2_path = self.samples[idx]
 
-        x = self._read(s2c_path)   # (13, H, W)
-        s1 = self._read(s1_path)   # (2, H, W)
-        y = self._read(s2_path)    # (13, H, W)
+        y = self._read(s2c_path)   # (13, H, W) cloudy
+        z = self._read(s1_path)    # (2, H, W) SAR
+        x0 = self._read(s2_path)   # (13, H, W) clean
 
-        return x, s1, y
+        # Optical preprocessing: clip to [0, 10000] and scale to [0, 1].
+        y = torch.clamp(y, 0.0, 10000.0) / 10000.0
+        x0 = torch.clamp(x0, 0.0, 10000.0) / 10000.0
+
+        # SAR preprocessing: VV in [-25, 0], VH in [-32.5, 0], scale to [0, 1].
+        if z.shape[0] >= 2:
+            vv = torch.clamp(z[0], -25.0, 0.0)
+            vh = torch.clamp(z[1], -32.5, 0.0)
+            vv = (vv + 25.0) / 25.0
+            vh = (vh + 32.5) / 32.5
+            z = torch.stack([vv, vh], dim=0)
+
+        return y, z, x0
