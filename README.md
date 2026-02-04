@@ -19,6 +19,16 @@ Train (DB-CR defaults: 50 epochs, batch size 4, lr 5e-5):
 ```
 python -m src.train --gpu 0
 ```
+Train on a smaller subset:
+```
+python -m src.train --gpu 0 --seasons winter --subset_frac 0.1
+python -m src.train --gpu 0 --seasons winter --subset_max 1000
+```
+Ignore invalid triplets (auto-loaded from `outputs/invalid_files.txt`):
+```
+python scripts/scan_invalid.py --seasons summer
+python -m src.train --gpu 0
+```
 
 Evaluate a checkpoint (ODE inference, NFE=1 default):
 ```
@@ -50,7 +60,8 @@ python -m src.main --mode eval --gpu 0 --checkpoint outputs/<run_name>/checkpoin
   - S1 (VV,VH): clip VV [-25,0], VH [-32.5,0], shift to positive then scale to [0,1].
 
 ## Metrics and images
-- Test/Eval metrics: L1, PSNR, SSIM (saved in `test_metrics.json` / `eval_metrics.json`).
+- Test/Eval metrics: L1, PSNR, SSIM, SAM(deg) (saved in `test_metrics.json` / `eval_metrics.json`).
+- LPIPS and FID are computed when `lpips` and `torchmetrics` are installed.
 - To save sample outputs:
 ```
 python -m src.train --save_images --num_save_images 4

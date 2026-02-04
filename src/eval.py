@@ -25,6 +25,8 @@ def parse_args():
     parser.add_argument("--log_every", type=int, default=10)
     parser.add_argument("--save_images", action="store_true")
     parser.add_argument("--num_save_images", type=int, default=4)
+    parser.add_argument("--subset_frac", type=float, default=1.0)
+    parser.add_argument("--subset_max", type=int, default=0)
     args = parser.parse_args()
     defaults = {k: parser.get_default(k) for k in vars(args)}
     return args, defaults
@@ -50,14 +52,14 @@ def main():
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 
     import torch
-    from torch.utils.data import DataLoader, random_split
+    from torch.utils.data import DataLoader, random_split, Subset
     from src.datasets.sen12mscr_dataset import SEN12MSCRDataset
     from src.models.dbcr import alpha_schedule
     from src.models.registry import get_model
     from src.utils.checkpoint import load_checkpoint
     from src.utils.io_utils import save_json
     from src.utils.logger import setup_logger
-    from src.utils.metrics import psnr, ssim
+    from src.utils.metrics import psnr, ssim, sam_deg
     from src.utils.image_utils import save_npy, save_rgb_png
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -73,6 +75,13 @@ def main():
     if len(dataset) == 0:
         logger.error("No samples found. Check dataset paths and file naming.")
         return
+    if args.subset_frac < 1.0 or args.subset_max > 0:
+        max_len = len(dataset)
+        frac_len = max(1, int(max_len * args.subset_frac))
+        if args.subset_max > 0:
+            frac_len = min(frac_len, args.subset_max)
+        indices = torch.randperm(max_len)[:frac_len]
+        dataset = Subset(dataset, indices.tolist())
 
     total = len(dataset)
     train_size = int(0.8 * total)
@@ -103,7 +112,21 @@ def main():
     test_l1 = 0.0
     test_psnr = 0.0
     test_ssim = 0.0
+    test_sam = 0.0
+    test_lpips = 0.0
     saved = 0
+    lpips_model = None
+    fid_metric = None
+    try:
+        import lpips
+        lpips_model = lpips.LPIPS(net="alex").to(device)
+    except Exception as exc:
+        logger.warning("LPIPS not available: %s", exc)
+    try:
+        from torchmetrics.image.fid import FrechetInceptionDistance
+        fid_metric = FrechetInceptionDistance(feature=2048).to(device)
+    except Exception as exc:
+        logger.warning("FID not available: %s", exc)
     with torch.no_grad():
         for step, (y, z, x0) in enumerate(test_loader, start=1):
             y = y.to(device)
@@ -125,6 +148,20 @@ def main():
             test_l1 += torch.mean(torch.abs(x0_hat - x0)).item()
             test_psnr += psnr(x0_hat, x0).item()
             test_ssim += ssim(x0_hat, x0).item()
+            test_sam += sam_deg(x0_hat, x0).item()
+
+            if lpips_model is not None or fid_metric is not None:
+                rgb_pred = x0_hat[:, [3, 2, 1], :, :].clamp(0.0, 1.0)
+                rgb_gt = x0[:, [3, 2, 1], :, :].clamp(0.0, 1.0)
+                if lpips_model is not None:
+                    lp_pred = rgb_pred * 2.0 - 1.0
+                    lp_gt = rgb_gt * 2.0 - 1.0
+                    test_lpips += lpips_model(lp_pred, lp_gt).mean().item()
+                if fid_metric is not None:
+                    rgb_pred_u8 = (rgb_pred * 255.0).to(torch.uint8)
+                    rgb_gt_u8 = (rgb_gt * 255.0).to(torch.uint8)
+                    fid_metric.update(rgb_pred_u8, real=False)
+                    fid_metric.update(rgb_gt_u8, real=True)
 
             if args.save_images and saved < args.num_save_images:
                 out_dir = os.path.join(run_dir, "images")
@@ -143,13 +180,24 @@ def main():
     test_l1 /= max(1, len(test_loader))
     test_psnr /= max(1, len(test_loader))
     test_ssim /= max(1, len(test_loader))
+    test_sam /= max(1, len(test_loader))
     results = {
         "eval_l1": round(test_l1, 6),
         "eval_psnr": round(test_psnr, 6),
         "eval_ssim": round(test_ssim, 6)
     }
+    results["eval_sam_deg"] = round(test_sam, 6)
+    if lpips_model is not None:
+        results["eval_lpips"] = round(test_lpips / max(1, len(test_loader)), 6)
+    if fid_metric is not None:
+        results["eval_fid"] = round(float(fid_metric.compute()), 6)
     save_json(os.path.join(run_dir, "eval_metrics.json"), results)
     logger.info("Eval L1: %.6f | PSNR: %.4f | SSIM: %.4f", test_l1, test_psnr, test_ssim)
+    logger.info("Eval SAM(deg): %.4f", test_sam)
+    if lpips_model is not None:
+        logger.info("Eval LPIPS: %.4f", results["eval_lpips"])
+    if fid_metric is not None:
+        logger.info("Eval FID: %.4f", results["eval_fid"])
 
 
 if __name__ == "__main__":

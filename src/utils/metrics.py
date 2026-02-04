@@ -26,3 +26,14 @@ def ssim(pred, target, max_val=1.0):
     num = (2 * mu_x * mu_y + c1) * (2 * sigma_xy + c2)
     den = (mu_x ** 2 + mu_y ** 2 + c1) * (sigma_x + sigma_y + c2)
     return torch.mean(num / (den + 1e-8))
+
+
+def sam_deg(pred, target, eps=1e-8):
+    # Spectral Angle Mapper in degrees, averaged over pixels and batch.
+    dot = torch.sum(pred * target, dim=1)
+    pred_norm = torch.norm(pred, dim=1)
+    target_norm = torch.norm(target, dim=1)
+    cos = dot / (pred_norm * target_norm + eps)
+    cos = torch.clamp(cos, -1.0, 1.0)
+    angle = torch.acos(cos)
+    return torch.mean(angle) * (180.0 / torch.pi)

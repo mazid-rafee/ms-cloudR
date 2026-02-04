@@ -7,6 +7,20 @@ class SEN12MSCRDataset(Dataset):
     def __init__(self, base_dir, seasons):
         self.samples = []
         valid_exts = {".tif", ".tiff"}
+        self.ignore_set = set()
+        default_ignore = os.path.join("outputs", "invalid_files.txt")
+        if os.path.isfile(default_ignore):
+            with open(default_ignore, "r", encoding="utf-8") as f:
+                for line in f:
+                    parts = line.strip().split("\t")
+                    if len(parts) >= 4:
+                        s2c, s1, s2 = parts[1:4]
+                        key = (
+                            os.path.normpath(s2c),
+                            os.path.normpath(s1),
+                            os.path.normpath(s2),
+                        )
+                        self.ignore_set.add(key)
 
         for season in seasons:
             s2c_dir = os.path.join(base_dir, f"{season}_s2_cloudy")
@@ -25,6 +39,13 @@ class SEN12MSCRDataset(Dataset):
                     s1_path = os.path.join(s1_dir, s1_rel)
                     s2_path = os.path.join(s2_dir, s2_rel)
                     if os.path.isfile(s1_path) and os.path.isfile(s2_path):
+                        key = (
+                            os.path.normpath(s2c_path),
+                            os.path.normpath(s1_path),
+                            os.path.normpath(s2_path),
+                        )
+                        if key in self.ignore_set:
+                            continue
                         self.samples.append((s2c_path, s1_path, s2_path))
 
     def __len__(self):

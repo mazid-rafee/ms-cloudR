@@ -3,19 +3,22 @@
   "config": "configs/dbcr.json",
   "data_dir": "data/SEN12MS-CR",
   "diffusion_steps": 1000,
-  "epochs": 5,
+  "epochs": 1,
   "lr": 5e-05,
   "model": "dbcr",
   "nfe": 1,
   "num_workers": 4,
-  "run_name": "20260204_161247",
+  "run_name": "20260204_214233",
   "seasons": [
-    "ROIs2017_winter"
+    "ROIs2017_winter",
+    "ROIs1868_summer",
+    "ROIs1970_fall",
+    "ROIs1158_spring"
   ],
   "seed": 42,
   "split_sizes": {
-    "test": 1834,
-    "train": 14666,
-    "val": 1833
+    "test": 12223,
+    "train": 97773,
+    "val": 12221
   }
 }

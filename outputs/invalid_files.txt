@@ -1,0 +1,1 @@
+31343	data/SEN12MS-CR/ROIs1868_summer_s2_cloudy/s2_cloudy_146/ROIs1868_summer_s2_cloudy_146_p202.tif	data/SEN12MS-CR/ROIs1868_summer_s1/s1_146/ROIs1868_summer_s1_146_p202.tif	data/SEN12MS-CR/ROIs1868_summer_s2/s2_146/ROIs1868_summer_s2_146_p202.tif
