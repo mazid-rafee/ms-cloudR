@@ -3,12 +3,12 @@
   "config": "configs/dbcr.json",
   "data_dir": "data/SEN12MS-CR",
   "diffusion_steps": 1000,
-  "epochs": 50,
+  "epochs": 5,
   "lr": 5e-05,
   "model": "dbcr",
   "nfe": 1,
   "num_workers": 4,
-  "run_name": "20260204_160524",
+  "run_name": "20260204_161247",
   "seasons": [
     "ROIs2017_winter"
   ],

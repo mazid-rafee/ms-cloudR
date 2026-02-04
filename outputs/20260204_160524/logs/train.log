@@ -1,6 +1,0 @@
-2026-02-04 11:05:24,992 | INFO | Using device: cuda
-2026-02-04 11:05:25,084 | INFO | GPU: NVIDIA A100-PCIE-40GB
-2026-02-04 11:05:25,085 | INFO | Building dataset...
-2026-02-04 11:05:25,602 | INFO | Dataset size: 18333 samples
-2026-02-04 11:05:25,604 | INFO | Train/Val/Test sizes: 14666/1833/1834
-2026-02-04 11:05:28,101 | INFO | Epoch 1/50

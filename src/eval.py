@@ -25,7 +25,9 @@ def parse_args():
     parser.add_argument("--log_every", type=int, default=10)
     parser.add_argument("--save_images", action="store_true")
     parser.add_argument("--num_save_images", type=int, default=4)
-    return parser.parse_args()
+    args = parser.parse_args()
+    defaults = {k: parser.get_default(k) for k in vars(args)}
+    return args, defaults
 
 
 def parse_seasons(value):
@@ -41,10 +43,10 @@ def progress_bar(prefix, step, total, bar_width=30):
 
 
 def main():
-    args = parse_args()
+    args, defaults = parse_args()
     if args.config:
         from src.utils.config import load_config, apply_config
-        args = apply_config(args, load_config(args.config))
+        args = apply_config(args, load_config(args.config), defaults=defaults)
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
 
     import torch
