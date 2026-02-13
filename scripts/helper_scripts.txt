@@ -1,0 +1,5 @@
+python scripts/gpu_manager.py --free --gpu 7
+python scripts/gpu_manager.py --alloc 32 --gpu 7
+
+nohup python -m src.train --gpu 7 --config configs/dbcr.json --epochs 50 > outputs/train.log 2>&1 &
+tail -f outputs/train.log 
