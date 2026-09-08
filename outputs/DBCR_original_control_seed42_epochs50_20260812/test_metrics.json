@@ -1,0 +1,8 @@
+{
+  "test_fid": 32.93837,
+  "test_l1": 0.011968,
+  "test_lpips": 0.201505,
+  "test_psnr": 34.016538,
+  "test_sam_deg": 3.632157,
+  "test_ssim": 0.886808
+}

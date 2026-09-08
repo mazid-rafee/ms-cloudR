@@ -177,4 +177,50 @@ class DBCRNet(nn.Module):
 
 
 def alpha_schedule(t, T):
+    """Original DB-CR sinusoidal bridge schedule. alpha(0)=0, alpha(T)=1."""
     return torch.sin((t / T) * math.pi / 2)
+
+
+def mean_reverting_alpha_schedule(t, T, rate=3.0):
+    """Deterministic mean-reverting bridge schedule with exact endpoints.
+
+    Uses normalized time s = t / T and
+        alpha(t) = (1 - exp(-rate * s)) / (1 - exp(-rate))
+    so that alpha(0) = 0 and alpha(T) = 1 exactly (up to floating-point).
+
+    Args:
+        t: scalar or tensor timesteps (same device as returned alpha).
+        T: total diffusion steps (positive scalar).
+        rate: mean-reversion rate; must be > 0.
+    """
+    if not torch.is_tensor(t):
+        t = torch.as_tensor(t, dtype=torch.float32)
+    t = t.float()
+
+    rate_val = float(rate.detach().item() if torch.is_tensor(rate) else rate)
+    if rate_val <= 0.0:
+        raise ValueError(f"mean_reversion_rate must be > 0, got {rate_val}")
+
+    s = t / float(T)
+    rate_t = torch.as_tensor(rate_val, dtype=t.dtype, device=t.device)
+    # expm1 improves accuracy for small rate; mathematically equal to
+    # (1 - exp(-rate * s)) / (1 - exp(-rate)).
+    return torch.expm1(-rate_t * s) / torch.expm1(-rate_t)
+
+
+def get_alpha_schedule(bridge_schedule="original", mean_reversion_rate=3.0):
+    """Return the alpha(t, T) callable for the selected bridge schedule."""
+    name = str(bridge_schedule).lower().replace("-", "_")
+    if name == "original":
+        return alpha_schedule
+    if name == "mean_reverting":
+        rate = float(mean_reversion_rate)
+
+        def schedule(t, T):
+            return mean_reverting_alpha_schedule(t, T, rate=rate)
+
+        return schedule
+    raise ValueError(
+        f"Unknown bridge_schedule '{bridge_schedule}'. "
+        "Expected 'original' or 'mean_reverting'."
+    )

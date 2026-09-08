@@ -19,7 +19,14 @@ def save_checkpoint(path, model, optimizer, epoch, extra=None):
 def load_checkpoint(path, model, optimizer=None, map_location=None):
     if not os.path.isfile(path):
         raise FileNotFoundError(f"Checkpoint not found: {path}")
-    payload = torch.load(path, map_location=map_location)
+    # Local experiment checkpoints may contain optimizer/scheduler metadata.
+    # Explicitly disable weights_only for trusted project artifacts (PyTorch >=2.6).
+    try:
+        payload = torch.load(
+            path, map_location=map_location, weights_only=False
+        )
+    except TypeError:
+        payload = torch.load(path, map_location=map_location)
     model.load_state_dict(payload["model_state"])
     if optimizer is not None and "optimizer_state" in payload:
         optimizer.load_state_dict(payload["optimizer_state"])

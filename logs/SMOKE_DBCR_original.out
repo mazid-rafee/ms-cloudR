@@ -1,0 +1,12 @@
+Traceback (most recent call last):
+  File "/usr/lib64/python3.6/runpy.py", line 193, in _run_module_as_main
+    "__main__", mod_spec)
+  File "/usr/lib64/python3.6/runpy.py", line 85, in _run_code
+    exec(code, run_globals)
+  File "/a/bear.cs.fiu.edu./disk/bear-b/users/mmazi007/Desktop/Source Code (Research)/Cloud Removal/src/train.py", line 369, in <module>
+    main()
+  File "/a/bear.cs.fiu.edu./disk/bear-b/users/mmazi007/Desktop/Source Code (Research)/Cloud Removal/src/train.py", line 71, in main
+    from src.datasets.sen12mscr_dataset import SEN12MSCRDataset
+  File "/a/bear.cs.fiu.edu./disk/bear-b/users/mmazi007/Desktop/Source Code (Research)/Cloud Removal/src/datasets/sen12mscr_dataset.py", line 2, in <module>
+    import rasterio
+ModuleNotFoundError: No module named 'rasterio'

@@ -20,6 +20,19 @@ def parse_args():
     parser.add_argument("--lr", type=float, default=5e-5)
     parser.add_argument("--diffusion_steps", type=int, default=1000)
     parser.add_argument("--nfe", type=int, default=1)
+    parser.add_argument(
+        "--bridge_schedule",
+        type=str,
+        default="original",
+        choices=["original", "mean_reverting"],
+        help="DB-CR alpha(t) trajectory: original sinusoidal or mean-reverting.",
+    )
+    parser.add_argument(
+        "--mean_reversion_rate",
+        type=float,
+        default=3.0,
+        help="Rate for mean_reverting bridge schedule (ignored if original).",
+    )
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--output_dir", type=str, default="outputs")
     parser.add_argument("--run_name", type=str, default="")
@@ -56,7 +69,7 @@ def main():
     import torch
     from torch.utils.data import DataLoader, random_split, Subset
     from src.datasets.sen12mscr_dataset import SEN12MSCRDataset
-    from src.models.dbcr import alpha_schedule
+    from src.models.dbcr import get_alpha_schedule
     from src.models.registry import get_model
     from src.utils.checkpoint import save_checkpoint, load_checkpoint
     from src.utils.io_utils import save_json, utc_timestamp
@@ -75,6 +88,17 @@ def main():
     logger.info("Using device: %s", device)
     if device == "cuda":
         logger.info("GPU: %s", torch.cuda.get_device_name(0))
+    logger.info("seed=%s", args.seed)
+    logger.info(
+        "bridge_schedule=%s mean_reversion_rate=%s diffusion_steps=%s",
+        args.bridge_schedule,
+        args.mean_reversion_rate,
+        args.diffusion_steps,
+    )
+    alpha_fn = get_alpha_schedule(
+        bridge_schedule=args.bridge_schedule,
+        mean_reversion_rate=args.mean_reversion_rate,
+    )
 
     seasons = parse_seasons(args.seasons)
     logger.info("Building dataset...")
@@ -135,6 +159,8 @@ def main():
     if args.model != "dbcr":
         raise NotImplementedError("Only DB-CR is wired into the training loop right now.")
     model = model_cls().to(device)
+    n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    logger.info("trainable_parameters=%d", n_params)
     opt = torch.optim.Adam(model.parameters(), lr=args.lr)
 
     start_epoch = 1
@@ -156,10 +182,13 @@ def main():
             "lr": args.lr,
             "diffusion_steps": args.diffusion_steps,
             "nfe": args.nfe,
+            "bridge_schedule": args.bridge_schedule,
+            "mean_reversion_rate": args.mean_reversion_rate,
             "seed": args.seed,
             "run_name": run_name,
             "model": args.model,
             "config": args.config,
+            "trainable_parameters": n_params,
             "split_sizes": {
                 "train": train_size,
                 "val": val_size,
@@ -178,7 +207,7 @@ def main():
             x0 = x0.to(device)
 
             t = torch.randint(0, args.diffusion_steps + 1, (x0.size(0),), device=device)
-            alpha_t = alpha_schedule(t.float(), args.diffusion_steps).view(-1, 1, 1, 1)
+            alpha_t = alpha_fn(t.float(), args.diffusion_steps).view(-1, 1, 1, 1)
             x_t = (1 - alpha_t) * x0 + alpha_t * y
             x0_hat = model(x_t, t, z)
             loss = torch.mean(torch.abs(x0_hat - x0))
@@ -205,7 +234,7 @@ def main():
                     x0 = x0.to(device)
 
                     t = torch.randint(0, args.diffusion_steps + 1, (x0.size(0),), device=device)
-                    alpha_t = alpha_schedule(t.float(), args.diffusion_steps).view(-1, 1, 1, 1)
+                    alpha_t = alpha_fn(t.float(), args.diffusion_steps).view(-1, 1, 1, 1)
                     x_t = (1 - alpha_t) * x0 + alpha_t * y
                     x0_hat = model(x_t, t, z)
                     loss = torch.mean(torch.abs(x0_hat - x0))
@@ -233,7 +262,11 @@ def main():
                 model,
                 opt,
                 epoch,
-                extra={"best_val": best_val}
+                extra={
+                    "best_val": best_val,
+                    "bridge_schedule": args.bridge_schedule,
+                    "mean_reversion_rate": args.mean_reversion_rate,
+                }
             )
 
     logger.info("Training complete.")
@@ -272,8 +305,8 @@ def main():
                 for k in range(args.nfe):
                     t_curr = timesteps[k]
                     t_next = timesteps[k + 1]
-                    alpha_curr = alpha_schedule(t_curr.float(), T).view(1, 1, 1, 1)
-                    alpha_next = alpha_schedule(t_next.float(), T).view(1, 1, 1, 1)
+                    alpha_curr = alpha_fn(t_curr.float(), T).view(1, 1, 1, 1)
+                    alpha_next = alpha_fn(t_next.float(), T).view(1, 1, 1, 1)
                     x0_hat = model(x_t, t_curr.repeat(x_t.size(0)), z)
                     x_t = (1 - alpha_next / alpha_curr) * x0_hat + (alpha_next / alpha_curr) * x_t
 

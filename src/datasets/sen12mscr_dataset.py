@@ -3,9 +3,20 @@ import rasterio
 import torch
 from torch.utils.data import Dataset
 
+from src.datasets.sen12mscr_utils import (
+    parse_roi_and_patch,
+    relative_cloudy_path,
+    resolve_season_tokens,
+    season_short_name,
+)
+
+
 class SEN12MSCRDataset(Dataset):
-    def __init__(self, base_dir, seasons):
+    def __init__(self, base_dir, seasons, *, return_index: bool = False):
+        self.base_dir = base_dir
         self.samples = []
+        self.sample_meta = []
+        self.return_index = return_index
         valid_exts = {".tif", ".tiff"}
         self.ignore_set = set()
         default_ignore = os.path.join("outputs", "invalid_files.txt")
@@ -22,10 +33,15 @@ class SEN12MSCRDataset(Dataset):
                         )
                         self.ignore_set.add(key)
 
-        for season in seasons:
+        if isinstance(seasons, str):
+            season_list = resolve_season_tokens(seasons)
+        else:
+            season_list = resolve_season_tokens(list(seasons))
+
+        for season in season_list:
             s2c_dir = os.path.join(base_dir, f"{season}_s2_cloudy")
-            s2_dir  = os.path.join(base_dir, f"{season}_s2")
-            s1_dir  = os.path.join(base_dir, f"{season}_s1")
+            s2_dir = os.path.join(base_dir, f"{season}_s2")
+            s1_dir = os.path.join(base_dir, f"{season}_s1")
 
             for root, _, files in os.walk(s2c_dir):
                 for fname in files:
@@ -46,7 +62,22 @@ class SEN12MSCRDataset(Dataset):
                         )
                         if key in self.ignore_set:
                             continue
+                        grouping = parse_roi_and_patch(s2c_path, season)
                         self.samples.append((s2c_path, s1_path, s2_path))
+                        self.sample_meta.append(
+                            {
+                                "season_prefix": season,
+                                "season": season_short_name(season),
+                                "cloudy_path": s2c_path,
+                                "sar_path": s1_path,
+                                "clean_path": s2_path,
+                                "relative_path": relative_cloudy_path(
+                                    s2c_path, base_dir
+                                ),
+                                "rel_within_season": rel_path,
+                                **grouping,
+                            }
+                        )
 
     def __len__(self):
         return len(self.samples)
@@ -58,9 +89,9 @@ class SEN12MSCRDataset(Dataset):
     def __getitem__(self, idx):
         s2c_path, s1_path, s2_path = self.samples[idx]
 
-        y = self._read(s2c_path)   # (13, H, W) cloudy
-        z = self._read(s1_path)    # (2, H, W) SAR
-        x0 = self._read(s2_path)   # (13, H, W) clean
+        y = self._read(s2c_path)  # (13, H, W) cloudy
+        z = self._read(s1_path)  # (2, H, W) SAR
+        x0 = self._read(s2_path)  # (13, H, W) clean
 
         # Optical preprocessing: clip to [0, 10000] and scale to [0, 1].
         y = torch.clamp(y, 0.0, 10000.0) / 10000.0
@@ -74,4 +105,6 @@ class SEN12MSCRDataset(Dataset):
             vh = (vh + 32.5) / 32.5
             z = torch.stack([vv, vh], dim=0)
 
+        if self.return_index:
+            return y, z, x0, idx
         return y, z, x0

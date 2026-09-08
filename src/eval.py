@@ -19,6 +19,19 @@ def parse_args():
     parser.add_argument("--diffusion_steps", type=int, default=1000)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--nfe", type=int, default=1)
+    parser.add_argument(
+        "--bridge_schedule",
+        type=str,
+        default="original",
+        choices=["original", "mean_reverting"],
+        help="DB-CR alpha(t) trajectory: original sinusoidal or mean-reverting.",
+    )
+    parser.add_argument(
+        "--mean_reversion_rate",
+        type=float,
+        default=3.0,
+        help="Rate for mean_reverting bridge schedule (ignored if original).",
+    )
     parser.add_argument("--checkpoint", type=str, required=True)
     parser.add_argument("--output_dir", type=str, default="outputs")
     parser.add_argument("--run_name", type=str, default="eval")
@@ -54,7 +67,7 @@ def main():
     import torch
     from torch.utils.data import DataLoader, random_split, Subset
     from src.datasets.sen12mscr_dataset import SEN12MSCRDataset
-    from src.models.dbcr import alpha_schedule
+    from src.models.dbcr import get_alpha_schedule
     from src.models.registry import get_model
     from src.utils.checkpoint import load_checkpoint
     from src.utils.io_utils import save_json
@@ -69,6 +82,15 @@ def main():
     logger.info("Using device: %s", device)
     if device == "cuda":
         logger.info("GPU: %s", torch.cuda.get_device_name(0))
+    logger.info(
+        "Bridge schedule: %s (mean_reversion_rate=%s)",
+        args.bridge_schedule,
+        args.mean_reversion_rate,
+    )
+    alpha_fn = get_alpha_schedule(
+        bridge_schedule=args.bridge_schedule,
+        mean_reversion_rate=args.mean_reversion_rate,
+    )
 
     seasons = parse_seasons(args.seasons)
     dataset = SEN12MSCRDataset(base_dir=args.data_dir, seasons=seasons)
@@ -140,8 +162,8 @@ def main():
             for k in range(args.nfe):
                 t_curr = timesteps[k]
                 t_next = timesteps[k + 1]
-                alpha_curr = alpha_schedule(t_curr.float(), T).view(1, 1, 1, 1)
-                alpha_next = alpha_schedule(t_next.float(), T).view(1, 1, 1, 1)
+                alpha_curr = alpha_fn(t_curr.float(), T).view(1, 1, 1, 1)
+                alpha_next = alpha_fn(t_next.float(), T).view(1, 1, 1, 1)
                 x0_hat = model(x_t, t_curr.repeat(x_t.size(0)), z)
                 x_t = (1 - alpha_next / alpha_curr) * x0_hat + (alpha_next / alpha_curr) * x_t
 
@@ -184,7 +206,9 @@ def main():
     results = {
         "eval_l1": round(test_l1, 6),
         "eval_psnr": round(test_psnr, 6),
-        "eval_ssim": round(test_ssim, 6)
+        "eval_ssim": round(test_ssim, 6),
+        "bridge_schedule": args.bridge_schedule,
+        "mean_reversion_rate": args.mean_reversion_rate,
     }
     results["eval_sam_deg"] = round(test_sam, 6)
     if lpips_model is not None:

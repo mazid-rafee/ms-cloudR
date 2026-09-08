@@ -1,14 +1,16 @@
 {
   "batch_size": 4,
+  "bridge_schedule": "original",
   "config": "configs/dbcr.json",
   "data_dir": "data/SEN12MS-CR",
   "diffusion_steps": 1000,
   "epochs": 50,
   "lr": 5e-05,
+  "mean_reversion_rate": 3.0,
   "model": "dbcr",
   "nfe": 1,
   "num_workers": 4,
-  "run_name": "DBCR_20260707",
+  "run_name": "DBCR_original_control",
   "seasons": [
     "ROIs2017_winter",
     "ROIs1868_summer",
@@ -20,5 +22,6 @@
     "test": 12223,
     "train": 97773,
     "val": 12221
-  }
+  },
+  "trainable_parameters": 13588641
 }
