@@ -1,0 +1,11 @@
+{
+  "model": "dbcr",
+  "batch_size": 4,
+  "epochs": 20,
+  "lr": 5e-5,
+  "seed": 123,
+  "diffusion_steps": 1000,
+  "nfe": 1,
+  "bridge_schedule": "spatial_mr_r3",
+  "mean_reversion_rate": 3.0
+}

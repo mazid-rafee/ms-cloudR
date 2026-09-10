@@ -23,14 +23,23 @@ def parse_args():
         "--bridge_schedule",
         type=str,
         default="original",
-        choices=["original", "mean_reverting"],
-        help="DB-CR alpha(t) trajectory: original sinusoidal or mean-reverting.",
+        choices=[
+            "original",
+            "mean_reverting",
+            "mr_r3",
+            "spatial_mr_r3",
+            "spatial_mean_reverting",
+        ],
+        help=(
+            "DB-CR bridge schedule used for training provenance / NFE=1 ODE alphas. "
+            "spatial_mr_r3 evaluates with scalar MR_r3 alphas at NFE=1."
+        ),
     )
     parser.add_argument(
         "--mean_reversion_rate",
         type=float,
         default=3.0,
-        help="Rate for mean_reverting bridge schedule (ignored if original).",
+        help="Rate for mean_reverting / SpatialMR r_max (ignored if original).",
     )
     parser.add_argument("--checkpoint", type=str, required=True)
     parser.add_argument("--output_dir", type=str, default="outputs")
@@ -83,10 +92,18 @@ def main():
     if device == "cuda":
         logger.info("GPU: %s", torch.cuda.get_device_name(0))
     logger.info(
-        "Bridge schedule: %s (mean_reversion_rate=%s)",
+        "Bridge schedule: %s (mean_reversion_rate=%s) nfe=%s",
         args.bridge_schedule,
         args.mean_reversion_rate,
+        args.nfe,
     )
+    if str(args.bridge_schedule).lower().replace("-", "_") in {
+        "spatial_mr_r3",
+        "spatial_mean_reverting",
+    } and int(args.nfe) != 1:
+        logger.warning(
+            "spatial_mr_r3 eval is intended for NFE=1; multi-step spatial reverse is not implemented."
+        )
     alpha_fn = get_alpha_schedule(
         bridge_schedule=args.bridge_schedule,
         mean_reversion_rate=args.mean_reversion_rate,

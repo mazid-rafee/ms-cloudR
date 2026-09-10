@@ -209,11 +209,17 @@ def mean_reverting_alpha_schedule(t, T, rate=3.0):
 
 
 def get_alpha_schedule(bridge_schedule="original", mean_reversion_rate=3.0):
-    """Return the alpha(t, T) callable for the selected bridge schedule."""
+    """Return the alpha(t, T) callable for the selected bridge schedule.
+
+    Spatial MR uses the scalar MR schedule for NFE=1 ODE inference only;
+    the spatially adaptive map is applied during training via
+    ``src.utils.spatial_bridge``.
+    """
     name = str(bridge_schedule).lower().replace("-", "_")
-    if name == "original":
+    if name in {"original", "sinusoidal"}:
         return alpha_schedule
-    if name == "mean_reverting":
+    if name in {"mean_reverting", "mr_r3", "spatial_mr_r3", "spatial_mean_reverting"}:
+        # spatial_mr_r3: training uses spatial A; inference (NFE=1) uses scalar MR_r3.
         rate = float(mean_reversion_rate)
 
         def schedule(t, T):
@@ -222,5 +228,5 @@ def get_alpha_schedule(bridge_schedule="original", mean_reversion_rate=3.0):
         return schedule
     raise ValueError(
         f"Unknown bridge_schedule '{bridge_schedule}'. "
-        "Expected 'original' or 'mean_reverting'."
+        "Expected 'original', 'mean_reverting'/'mr_r3', or 'spatial_mr_r3'."
     )

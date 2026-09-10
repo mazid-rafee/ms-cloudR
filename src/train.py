@@ -24,14 +24,23 @@ def parse_args():
         "--bridge_schedule",
         type=str,
         default="original",
-        choices=["original", "mean_reverting"],
-        help="DB-CR alpha(t) trajectory: original sinusoidal or mean-reverting.",
+        choices=[
+            "original",
+            "mean_reverting",
+            "mr_r3",
+            "spatial_mr_r3",
+            "spatial_mean_reverting",
+        ],
+        help=(
+            "DB-CR bridge: original sinusoidal, scalar MR_r3 (mean_reverting/mr_r3), "
+            "or spatially adaptive MR (spatial_mr_r3)."
+        ),
     )
     parser.add_argument(
         "--mean_reversion_rate",
         type=float,
         default=3.0,
-        help="Rate for mean_reverting bridge schedule (ignored if original).",
+        help="r / r_max for MR schedules (scalar or SpatialMR).",
     )
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--output_dir", type=str, default="outputs")
@@ -76,6 +85,11 @@ def main():
     from src.utils.logger import setup_logger, append_metrics_csv
     from src.utils.metrics import psnr, ssim, sam_deg
     from src.utils.image_utils import save_npy, save_rgb_png
+    from src.utils.spatial_bridge import (
+        construct_spatial_mr_bridge,
+        is_spatial_mr_schedule,
+        normalize_bridge_schedule,
+    )
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
     run_name = args.run_name or utc_timestamp()
@@ -89,12 +103,23 @@ def main():
     if device == "cuda":
         logger.info("GPU: %s", torch.cuda.get_device_name(0))
     logger.info("seed=%s", args.seed)
+    bridge_key = normalize_bridge_schedule(args.bridge_schedule)
+    use_spatial_mr = is_spatial_mr_schedule(args.bridge_schedule)
     logger.info(
-        "bridge_schedule=%s mean_reversion_rate=%s diffusion_steps=%s",
+        "bridge_schedule=%s (normalized=%s) mean_reversion_rate=%s diffusion_steps=%s nfe=%s",
         args.bridge_schedule,
+        bridge_key,
         args.mean_reversion_rate,
         args.diffusion_steps,
+        args.nfe,
     )
+    if use_spatial_mr and int(args.nfe) != 1:
+        logger.warning(
+            "spatial_mr_r3 is validated for NFE=1 only; got nfe=%s. "
+            "Proceeding, but multi-step spatial reverse is NOT implemented.",
+            args.nfe,
+        )
+    # Inference ODE alphas: original / scalar MR_r3 (spatial training still uses spatial A).
     alpha_fn = get_alpha_schedule(
         bridge_schedule=args.bridge_schedule,
         mean_reversion_rate=args.mean_reversion_rate,
@@ -207,8 +232,17 @@ def main():
             x0 = x0.to(device)
 
             t = torch.randint(0, args.diffusion_steps + 1, (x0.size(0),), device=device)
-            alpha_t = alpha_fn(t.float(), args.diffusion_steps).view(-1, 1, 1, 1)
-            x_t = (1 - alpha_t) * x0 + alpha_t * y
+            if use_spatial_mr:
+                x_t, _, _, _ = construct_spatial_mr_bridge(
+                    x0,
+                    y,
+                    t,
+                    args.diffusion_steps,
+                    r_max=args.mean_reversion_rate,
+                )
+            else:
+                alpha_t = alpha_fn(t.float(), args.diffusion_steps).view(-1, 1, 1, 1)
+                x_t = (1 - alpha_t) * x0 + alpha_t * y
             x0_hat = model(x_t, t, z)
             loss = torch.mean(torch.abs(x0_hat - x0))
 
@@ -234,8 +268,17 @@ def main():
                     x0 = x0.to(device)
 
                     t = torch.randint(0, args.diffusion_steps + 1, (x0.size(0),), device=device)
-                    alpha_t = alpha_fn(t.float(), args.diffusion_steps).view(-1, 1, 1, 1)
-                    x_t = (1 - alpha_t) * x0 + alpha_t * y
+                    if use_spatial_mr:
+                        x_t, _, _, _ = construct_spatial_mr_bridge(
+                            x0,
+                            y,
+                            t,
+                            args.diffusion_steps,
+                            r_max=args.mean_reversion_rate,
+                        )
+                    else:
+                        alpha_t = alpha_fn(t.float(), args.diffusion_steps).view(-1, 1, 1, 1)
+                        x_t = (1 - alpha_t) * x0 + alpha_t * y
                     x0_hat = model(x_t, t, z)
                     loss = torch.mean(torch.abs(x0_hat - x0))
                     val_total += loss.item()
@@ -269,7 +312,20 @@ def main():
                 }
             )
 
-    logger.info("Training complete.")
+    # Always keep a final-epoch checkpoint (does not replace best.pt).
+    save_checkpoint(
+        os.path.join(ckpt_dir, "last.pt"),
+        model,
+        opt,
+        args.epochs if start_epoch <= args.epochs else start_epoch - 1,
+        extra={
+            "best_val": best_val,
+            "bridge_schedule": args.bridge_schedule,
+            "mean_reversion_rate": args.mean_reversion_rate,
+            "checkpoint_type": "last",
+        },
+    )
+    logger.info("Training complete. Saved last.pt and best.pt (if improved).")
 
     if len(test_loader) > 0:
         logger.info("Starting test...")

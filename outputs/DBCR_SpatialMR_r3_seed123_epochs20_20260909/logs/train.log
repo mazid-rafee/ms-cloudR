@@ -1,0 +1,9 @@
+2026-09-09 21:23:55,315 | INFO | Using device: cuda
+2026-09-09 21:23:55,431 | INFO | GPU: NVIDIA A100-PCIE-40GB
+2026-09-09 21:23:55,431 | INFO | seed=123
+2026-09-09 21:23:55,432 | INFO | bridge_schedule=spatial_mr_r3 (normalized=spatial_mr_r3) mean_reversion_rate=3.0 diffusion_steps=1000 nfe=1
+2026-09-09 21:23:55,432 | INFO | Building dataset...
+2026-09-09 21:24:19,121 | INFO | Dataset size: 122217 samples
+2026-09-09 21:24:19,143 | INFO | Train/Val/Test sizes: 97773/12221/12223
+2026-09-09 21:24:20,562 | INFO | trainable_parameters=13588641
+2026-09-09 21:24:32,013 | INFO | Epoch 1/20
