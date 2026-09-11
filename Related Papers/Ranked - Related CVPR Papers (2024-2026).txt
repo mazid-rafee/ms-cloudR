@@ -1,0 +1,169 @@
+https://openaccess.thecvf.com/CVPR2026?day=all
+https://openaccess.thecvf.com/CVPR2025?day=all
+https://openaccess.thecvf.com/CVPR2024?day=all
+
+TOP 20 MOST RELEVANT CVPR 2024–2026 PAPERS FOR SEN12MS-CR CLOUD REMOVAL PROJECT
+
+1. Effective Cloud Removal for Remote Sensing Images by an Improved Mean-Reverting Denoising Model with Elucidated Design Space (EMRDM)
+   Year: CVPR 2025
+   Relevance: FR+++
+   Reason: Direct remote-sensing cloud removal. Builds a direct cloudy-to-cloudless mean-reverting diffusion process with reformulated forward dynamics and an ODE-based backward process. Extremely close to the project task and forward/reverse modeling direction.
+
+2. Residual Diffusion Bridge Model for Image Restoration (RDBM)
+   Year: CVPR 2026
+   Relevance: FR-Method+++
+   Reason: General image restoration rather than cloud removal, but highly relevant mathematically. Develops generalized forward/reverse diffusion bridges and uses clean-degraded residuals to control restoration while preserving intact information.
+
+3. Spatial-Spectral Residuals Informed Diffusion Neural Operator for Pan-sharpening
+   Year: CVPR 2026
+   Relevance: SR+++
+   Reason: Remote-sensing reconstruction combining diffusion, neural operators, and spatial-spectral residual constraints. Particularly important for PDE/operator-style modeling and scientific spectral fidelity.
+
+4. EMR-Diff: Edge-aware Multimodal Residual Diffusion Model for Hyperspectral Image Super-resolution
+   Year: CVPR 2026
+   Relevance: SR+++
+   Reason: Multimodal remote-sensing reconstruction using residual diffusion. Jointly preserves spatial and spectral information and uses complementary modalities to reconstruct the desired observation.
+
+5. Degradation-Robust Fusion: An Efficient Degradation-Aware Diffusion Framework for Multimodal Image Fusion in Arbitrary Degradation Scenarios
+   Year: CVPR 2026
+   Relevance: SR+++
+   Reason: Multimodal diffusion under degraded observations. Uses observation-model and fusion constraints during sampling, making it highly relevant to observation-supported SAR-optical reconstruction.
+
+6. Bi-Bridge: Bidirectional Diffusion Bridges for Low-Light Image Enhancement
+   Year: CVPR 2026
+   Relevance: SR+++
+   Reason: Learns restoration and degradation directions together using bidirectional diffusion bridges. Strong conceptual connection to forward/reverse dynamics and cycle/round-trip consistency.
+
+7. Bridging Remote Sensors with Multisensor Geospatial Foundation Models (msGFM)
+   Year: CVPR 2024
+   Relevance: SR+++
+   Reason: Learns jointly from multiple remote sensors including optical and microwave modalities. Supports paired/unpaired sensor data and includes cloud removal as a downstream task.
+
+8. Self-Learning Hyperspectral and Multispectral Image Fusion via Adaptive Residual Guided Subspace Diffusion Model (ARGS-Diff)
+   Year: CVPR 2025
+   Relevance: SR+++
+   Reason: Multimodal spectral-spatial reconstruction using diffusion and residual-guided subspace decomposition. Relevant to preserving physically meaningful spectral structure.
+
+9. Semantic-Adaptive Diffusion for Dynamic Spatiotemporal Fusion
+   Year: CVPR 2026
+   Relevance: SR+++
+   Reason: Remote-sensing reconstruction using diffusion for spatiotemporal fusion while maintaining spectral consistency and spatial detail.
+
+10. ReCoFuse: Ultra-Robust Image Fusion via Restorative Multi-Modal Diffusion Reciprocal Coupling
+    Year: CVPR 2026
+    Relevance: SR+++
+    Reason: Jointly couples restoration and multimodal fusion rather than treating fusion as static conditioning. Relevant to dynamically integrating SAR information during cloud reconstruction.
+
+11. Building Bridges across Spatial and Temporal Resolutions: Reference-Based Super-Resolution via Change Priors and Conditional Diffusion Model
+    Year: CVPR 2024
+    Relevance: SR++
+    Reason: Remote-sensing conditional diffusion with mechanisms for determining when auxiliary/reference information should be trusted. Relevant to preventing inappropriate information transfer during SAR-guided reconstruction.
+
+12. Dual Ascent Diffusion for Inverse Problems
+    Year: CVPR 2026
+    Relevance: SR++
+    Reason: Treats diffusion-based reconstruction as a constrained inverse problem using MAP estimation and dual-ascent optimization. Relevant to explicit observation/data consistency.
+
+13. HIR-Diff: Unsupervised Hyperspectral Image Restoration Via Improved Diffusion Models
+    Year: CVPR 2024
+    Relevance: SR++
+    Reason: Hyperspectral restoration combining diffusion with low-rank and total-variation priors. Useful precedent for combining mathematical priors with learned generative restoration.
+
+14. HalluGen: Synthesizing Realistic and Controllable Hallucinations for Evaluating Image Restoration
+    Year: CVPR 2026
+    Relevance: SR++ (Evaluation)
+    Reason: Directly studies hallucinated but perceptually realistic restoration outputs. Particularly relevant to scientific fidelity because visually plausible reconstructions may still be scientifically incorrect.
+
+15. Hyperspectral Pansharpening via Diffusion Models with Iteratively Zero-Shot Guidance
+    Year: CVPR 2025
+    Relevance: SR++
+    Reason: Uses measurement-guided diffusion for hyperspectral reconstruction while explicitly respecting spectral information. Relevant to controlling generative priors with actual observations.
+
+16. Regulating Rather than Constraining: Adaptive Guidance for Complex Spectral Reconstruction in Pansharpening
+    Year: CVPR 2026
+    Relevance: SR++
+    Reason: Focuses directly on spectral reconstruction and argues that overly rigid physical constraints can hurt heterogeneous spectral recovery. Relevant when designing conservation/spectral constraints.
+
+17. UniFusion: A Unified Image Fusion Framework with Robust Representation and Source-Aware Preservation
+    Year: CVPR 2026
+    Relevance: SR++
+    Reason: Uses source-aware preservation and reconstruction-alignment objectives to keep fused results consistent with original observations. Highly relevant to preventing unsupported SAR-optical fusion artifacts.
+
+18. TESSERA: Temporal Embeddings of Surface Spectra for Earth Representation and Analysis
+    Year: CVPR 2026
+    Relevance: SR++
+    Reason: Jointly models Sentinel-1 and Sentinel-2 and explicitly deals with irregular optical observations including cloud obstruction. Useful for S1/S2 representation design.
+
+19. SARMAE: Masked Autoencoder for SAR Representation Learning
+    Year: CVPR 2026
+    Relevance: SR++
+    Reason: SAR-specific representation learning that accounts for speckle and uses paired optical information for semantic alignment. Relevant to improving the Sentinel-1 VV/VH branch.
+
+20. Multi-Modal Image Fusion via Intervention-Stable Feature Learning
+    Year: CVPR 2026
+    Relevance: SR++
+    Reason: Tests whether one modality genuinely provides complementary information using masking and modality interventions. Very useful for proving that SAR contributes real information to cloud reconstruction instead of acting as a generic auxiliary feature.
+
+READING PRIORITY
+
+Tier A - Must read fully before finalizing the model:
+
+1. EMRDM
+2. Residual Diffusion Bridge Model
+3. Spatial-Spectral Residuals Informed Diffusion Neural Operator
+4. EMR-Diff
+5. Degradation-Robust Fusion
+6. Bi-Bridge
+
+Tier B - Study methodology carefully:
+7. msGFM
+8. ARGS-Diff
+9. Semantic-Adaptive Diffusion
+10. ReCoFuse
+11. Building Bridges across Spatial and Temporal Resolutions
+12. Dual Ascent Diffusion
+13. HIR-Diff
+
+Tier C - Extract specific ideas for evaluation, losses, fusion, or encoders:
+14. HalluGen
+15. Hyperspectral Pansharpening via Diffusion Models with Iteratively Zero-Shot Guidance
+16. Regulating Rather than Constraining
+17. UniFusion
+18. TESSERA
+19. SARMAE
+20. Multi-Modal Image Fusion via Intervention-Stable Feature Learning
+
+CORE PAPERS MOST LIKELY TO AFFECT NOVELTY OF OUR METHOD
+
+EMRDM
+Residual Diffusion Bridge Model
+Spatial-Spectral Residuals Informed Diffusion Neural Operator
+EMR-Diff
+Degradation-Robust Fusion
+Bi-Bridge
+ReCoFuse
+
+CORE PAPERS FOR SCIENTIFIC / SPECTRAL FIDELITY
+
+Spatial-Spectral Residuals Informed Diffusion Neural Operator
+EMR-Diff
+ARGS-Diff
+HIR-Diff
+HalluGen
+Hyperspectral Pansharpening via Diffusion Models with Iteratively Zero-Shot Guidance
+Regulating Rather than Constraining
+UniFusion
+
+CORE PAPERS FOR SAR-OPTICAL FUSION
+
+msGFM
+ReCoFuse
+Degradation-Robust Fusion
+TESSERA
+SARMAE
+Multi-Modal Image Fusion via Intervention-Stable Feature Learning
+
+IMPORTANT NON-CVPR PAPER TO KEEP BESIDE THIS LIST
+
+DB-CR: Multimodal Diffusion Bridge with Attention-Based SAR Fusion for Satellite Image Cloud Removal
+Reason: One of the closest papers to the actual SEN12MS-CR setting: cloudy Sentinel-2 + Sentinel-1 SAR -> cloud-free Sentinel-2 using a diffusion bridge. It should remain a primary baseline/reference even though it is not one of the CVPR 2024-2026 main-conference papers.
