@@ -144,21 +144,61 @@ class DBCRNet(nn.Module):
             self.opt_dec.append(nn.Sequential(*[NAFBlock(widths[i - 1]) for _ in range(dec_blocks[len(widths) - 1 - i])]))
 
         self.head = nn.Conv2d(widths[0], in_opt, 1)
+        self.widths = tuple(widths)
 
-    def forward(self, x_t, t, z):
-        b = x_t.size(0)
+    def _expand_timesteps(self, t, batch_size):
         t = t.float()
+        if t.ndim == 0:
+            return t.expand(batch_size)
+        if t.numel() == 1 and batch_size > 1:
+            return t.reshape(1).expand(batch_size)
+        if t.shape[0] != batch_size:
+            raise ValueError(
+                f"timestep batch {tuple(t.shape)} incompatible with batch_size={batch_size}"
+            )
+        return t
+
+    def extract_optical_stage3(self, x, t):
+        """Optical-only stage-3 features immediately before fusion.
+
+        Runs opt_stem + time bias + opt_enc + shared downs through stage 3.
+        Does NOT run SAR, SFBlock, mid, decoder, or head.
+        Intended for a frozen teacher semantic anchor on clean x0.
+        """
+        b = x.size(0)
+        t = self._expand_timesteps(t, b)
+        t_embed = self.time_mlp(t)
+
+        opt = self.opt_stem(x)
+        last = len(self.opt_enc) - 1
+        for i in range(len(self.opt_enc)):
+            bias = self.time_to_channels[i](t_embed).view(b, -1, 1, 1)
+            opt = opt + bias
+            opt = self.opt_enc[i](opt)
+            if i == last:
+                return opt
+            opt = self.downs[i](opt)
+        raise RuntimeError("extract_optical_stage3 failed to reach final stage")
+
+    def forward(self, x_t, t, z, return_aux=False):
+        b = x_t.size(0)
+        t = self._expand_timesteps(t, b)
         t_embed = self.time_mlp(t)
 
         opt = self.opt_stem(x_t)
         sar = self.sar_stem(z)
 
         skips = []
+        sar_stage3 = None
+        last = len(self.opt_enc) - 1
         for i in range(len(self.opt_enc)):
             bias = self.time_to_channels[i](t_embed).view(b, -1, 1, 1)
             opt = opt + bias
             opt = self.opt_enc[i](opt)
             sar = self.sar_enc[i](sar)
+            if return_aux and i == last:
+                # Pre-fusion deepest SAR feature (stage 3).
+                sar_stage3 = sar
             opt = self.fuse[i](opt, sar)
             skips.append(opt)
             if i < len(self.downs):
@@ -173,7 +213,12 @@ class DBCRNet(nn.Module):
             opt = opt + skip
             opt = self.opt_dec[i](opt)
 
-        return self.head(opt)
+        x0_hat = self.head(opt)
+        if return_aux:
+            if sar_stage3 is None:
+                raise RuntimeError("return_aux requested but sar_stage3 was not collected")
+            return x0_hat, {"sar_stage3": sar_stage3}
+        return x0_hat
 
 
 def alpha_schedule(t, T):
