@@ -1,0 +1,9 @@
+2026-09-12 03:45:18,088 | INFO | Using device: cuda
+2026-09-12 03:45:18,219 | INFO | GPU: NVIDIA A100-PCIE-40GB
+2026-09-12 03:45:18,220 | INFO | seed=42 sar_intervention_seed=123
+2026-09-12 03:45:18,220 | INFO | Bridge schedule: mean_reverting (mean_reversion_rate=3.0) nfe=1 sar_intervention=normal
+2026-09-12 03:45:18,220 | INFO | checkpoint=outputs/DBCR_MR_r3_seed42_epochs50_20260812/checkpoints/best.pt
+2026-09-12 03:52:10,951 | INFO | Eval L1: 0.011096 | PSNR: 34.5066 | SSIM: 0.8963
+2026-09-12 03:52:10,952 | INFO | Eval SAM(deg): 3.3489
+2026-09-12 03:52:10,952 | INFO | Eval LPIPS: 0.1940
+2026-09-12 03:52:10,952 | INFO | Eval FID: 31.7565

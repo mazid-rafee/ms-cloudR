@@ -1,0 +1,11 @@
+2026-09-12 03:27:56,795 | INFO | Using device: cpu
+2026-09-12 03:27:56,796 | INFO | seed=42 sar_intervention_seed=123
+2026-09-12 03:27:56,796 | INFO | Bridge schedule: mean_reverting (mean_reversion_rate=3.0) nfe=1 sar_intervention=zero
+2026-09-12 03:27:56,796 | INFO | checkpoint=outputs/DBCR_MR_r3_seed42_epochs50_20260812/checkpoints/best.pt
+2026-09-12 03:28:00,127 | INFO | SAR intervention: zero (wrapped test set, n=3)
+2026-09-12 03:28:00,780 | INFO | Region metrics ON (eval-only). Soft cloud score is NOT fed to the model.
+2026-09-12 03:28:22,494 | INFO | Eval L1: 0.042795 | PSNR: 25.8268 | SSIM: 0.7016
+2026-09-12 03:28:22,494 | INFO | Eval SAM(deg): 8.7056
+2026-09-12 03:28:22,494 | INFO | Eval LPIPS: 0.1786
+2026-09-12 03:28:22,495 | INFO | Eval FID: 169.1012
+2026-09-12 03:28:22,495 | INFO | Eval cloud/clear L1(soft): 0.081974 / 0.042779 | SAM(soft): 8.5337 / 8.7049

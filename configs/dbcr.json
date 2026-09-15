@@ -1,7 +1,7 @@
 {
   "model": "dbcr",
   "batch_size": 4,
-  "epochs": 20,
+  "epochs": 50,
   "lr": 5e-5,
   "diffusion_steps": 1000,
   "nfe": 1,

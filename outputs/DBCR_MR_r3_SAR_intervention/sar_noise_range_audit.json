@@ -1,0 +1,61 @@
+{
+  "observed_processed_sar": {
+    "channels": {
+      "VH": {
+        "frac_at_0": 0.006488442420959473,
+        "frac_at_1": 0.00011733174324035645,
+        "max": 1.0,
+        "mean": 0.44080718393551804,
+        "min": 0.0,
+        "std": 0.15407084901020124
+      },
+      "VV": {
+        "frac_at_0": 0.010594785213470459,
+        "frac_at_1": 0.004966825246810913,
+        "max": 1.0,
+        "mean": 0.5433059702691414,
+        "min": 0.0,
+        "std": 0.17801427907119624
+      }
+    },
+    "n_pixels_per_channel": 33554432,
+    "n_samples": 512,
+    "n_test_split": 12223,
+    "preprocessing": "VV: clamp([-25,0]); (VV+25)/25. VH: clamp([-32.5,0]); (VH+32.5)/32.5.",
+    "source": "processed_test_set_sar",
+    "theoretical_normalized_range": [
+      0.0,
+      1.0
+    ]
+  },
+  "unbounded_gaussian_noise": {
+    "clipped": false,
+    "empirical": {
+      "VH": {
+        "frac_above_1": 0.00014218688011169434,
+        "frac_below_0": 0.002106219530105591,
+        "frac_outside_0_1": 0.002248406410217285
+      },
+      "VV": {
+        "frac_above_1": 0.005151838064193726,
+        "frac_below_0": 0.0011289417743682861,
+        "frac_outside_0_1": 0.006280779838562012
+      },
+      "both_channels_frac_outside_0_1": 0.0042645931243896484,
+      "n_generated_pixels_per_channel": 33554432
+    },
+    "recommendation": "A non-trivial fraction of N(mu,sigma) pixels fall outside [0,1]. Clipping to [0,1] would keep the intervention on the same manifold as real processed SAR. Leaving it unbounded is a harsher OOD probe. Do not change until approved.",
+    "theoretical_normal_cdf": {
+      "VH": {
+        "above": 0.0001420115363759411,
+        "below": 0.00211108205744881,
+        "total": 0.002253093593824751
+      },
+      "VV": {
+        "above": 0.005151494800845757,
+        "below": 0.0011364745768591145,
+        "total": 0.006287969377704872
+      }
+    }
+  }
+}

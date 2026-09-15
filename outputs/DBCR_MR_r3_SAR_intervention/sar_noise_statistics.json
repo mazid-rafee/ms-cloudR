@@ -1,0 +1,22 @@
+{
+  "channels": {
+    "VH": {
+      "index": 1,
+      "mean": 0.4427777157138892,
+      "std": 0.15115818242623563
+    },
+    "VV": {
+      "index": 0,
+      "mean": 0.5447268809856644,
+      "std": 0.1763129277522179
+    }
+  },
+  "n_pixels_per_channel": 801046528,
+  "n_samples": 12223,
+  "normalized_range": [
+    0.0,
+    1.0
+  ],
+  "preprocessing": "VV: clamp(z, -25, 0); (VV + 25) / 25. VH: clamp(z, -32.5, 0); (VH + 32.5) / 32.5. Theoretical normalized range is [0, 1] for both channels.",
+  "source": "processed_test_set_sar"
+}

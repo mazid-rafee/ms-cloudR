@@ -1,0 +1,19 @@
+{
+  "bridge_schedule": "mean_reverting",
+  "checkpoint": "outputs/DBCR_MR_r3_seed42_epochs50_20260812/checkpoints/best.pt",
+  "eval_clear_l1_soft": 0.024315,
+  "eval_clear_sam_soft": 7.557059,
+  "eval_cloud_l1_soft": 0.032834,
+  "eval_cloud_sam_soft": 9.628073,
+  "eval_fid": 37.703556,
+  "eval_l1": 0.025016,
+  "eval_lpips": 0.23279,
+  "eval_psnr": 28.883091,
+  "eval_sam_deg": 7.728708,
+  "eval_ssim": 0.783134,
+  "mean_reversion_rate": 3.0,
+  "nfe": 1,
+  "sar_intervention": "noise",
+  "sar_intervention_seed": 123,
+  "seed": 42
+}

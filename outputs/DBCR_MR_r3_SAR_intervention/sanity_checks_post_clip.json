@@ -1,0 +1,113 @@
+{
+  "bridge_schedule": "mean_reverting",
+  "checkpoint": "outputs/DBCR_MR_r3_seed42_epochs50_20260812/checkpoints/best.pt",
+  "checkpoint_sha256": "d4bf16a6691cd66d0aff3bb3ecd6a36f9a6b1b148b3727f32c2345ed0a110dc1",
+  "checks": {
+    "bridge_not_original_sinusoidal": true,
+    "checkpoint_exists": true,
+    "checkpoint_identical_path_all_modes": true,
+    "clean_s2_unchanged": true,
+    "cloud_score_eval_only_shape": true,
+    "cloud_score_soft_range": true,
+    "cloudy_s2_unchanged": true,
+    "dataset_level_derangement": true,
+    "derangement_deterministic": true,
+    "derangement_no_fixed_points": true,
+    "mapping_length_matches_test": true,
+    "mr_r3_endpoints": true,
+    "mr_r3_matches_closed_form": true,
+    "mr_r3_schedule_selected": true,
+    "nfe_is_1": true,
+    "noise_max_le_1": true,
+    "noise_min_ge_0": true,
+    "noise_stats_from_processed_test_sar": true,
+    "noise_uses_test_mean_std": true,
+    "noise_wrapper_deterministic": true,
+    "normal_full_metric_reproduction": null,
+    "normal_sar_unchanged": true,
+    "normal_wrapper_deterministic": true,
+    "optical_preprocessing_unchanged": true,
+    "region_l1_matches_ordinary_l1_when_M_is_one": true,
+    "region_sam_matches_ordinary_when_M_is_one": true,
+    "sam_angle_map_shape_BHW": true,
+    "sar_preprocessing_before_intervention_unchanged": true,
+    "seeds_logged": true,
+    "shuffled_matches_replacement_tensor": true,
+    "shuffled_same_shape_dtype": true,
+    "shuffled_uses_other_test_sample": true,
+    "vv_vh_stay_paired": true,
+    "zero_is_clip_floor_not_missing_modality": true,
+    "zero_sar_exactly_zero": true
+  },
+  "mean_reversion_rate": 3.0,
+  "model_notes": {
+    "inference_no_grad": "required in src.eval.run_eval (torch.no_grad())",
+    "model_eval_used": "required in src.eval.run_eval (model.eval())"
+  },
+  "n_test_checked": 3,
+  "nfe": 1,
+  "noise_stats": {
+    "channels": {
+      "VH": {
+        "index": 1,
+        "mean": 0.4590686221303149,
+        "std": 0.15181309295342887
+      },
+      "VV": {
+        "index": 0,
+        "mean": 0.5977969234400007,
+        "std": 0.1618404595292825
+      }
+    },
+    "n_pixels_per_channel": 196608,
+    "n_samples": 3,
+    "normalized_range": [
+      0.0,
+      1.0
+    ],
+    "preprocessing": "VV: clamp(z, -25, 0); (VV + 25) / 25. VH: clamp(z, -32.5, 0); (VH + 32.5) / 32.5. Theoretical normalized range is [0, 1] for both channels.",
+    "source": "processed_test_set_sar"
+  },
+  "notes": [
+    "All-zero normalized SAR is the clip floor (VV=-25 dB, VH=-32.5 dB), not a missing-modality / mean / neutral token. Kept as a diagnostic.",
+    "Soft cloud score is computed from cloudy S2 only and is never concatenated or used in the bridge/model. No binary threshold is invented.",
+    "Check 16 (NORMAL reproduces recorded DBCR_MR_r3 test metrics) requires a full test-set eval and is deferred until that run is approved. Recorded seed-42 / 50-epoch reference: {'run': 'outputs/DBCR_MR_r3_seed42_epochs50_20260812', 'test_l1': 0.011096, 'test_psnr': 34.506577, 'test_ssim': 0.896302, 'test_sam_deg': 3.348875, 'test_lpips': 0.193985, 'test_fid': 31.756464}."
+  ],
+  "recorded_baseline": {
+    "run": "outputs/DBCR_MR_r3_seed42_epochs50_20260812",
+    "test_fid": 31.756464,
+    "test_l1": 0.011096,
+    "test_lpips": 0.193985,
+    "test_psnr": 34.506577,
+    "test_sam_deg": 3.348875,
+    "test_ssim": 0.896302
+  },
+  "sar_intervention_seed": 123,
+  "seed": 42,
+  "shuffle_preview": [
+    {
+      "original_dataset_index": 17847,
+      "original_sample_id": "ROIs2017_winter_s2_cloudy/s2_cloudy_146/ROIs2017_winter_s2_cloudy_146_p306.tif",
+      "replacement_dataset_index": 12955,
+      "replacement_sar_sample_id": "ROIs2017_winter_s2_cloudy/s2_cloudy_68/ROIs2017_winter_s2_cloudy_68_p125.tif",
+      "replacement_test_index": 1,
+      "test_index": 0
+    },
+    {
+      "original_dataset_index": 12955,
+      "original_sample_id": "ROIs2017_winter_s2_cloudy/s2_cloudy_68/ROIs2017_winter_s2_cloudy_68_p125.tif",
+      "replacement_dataset_index": 8228,
+      "replacement_sar_sample_id": "ROIs2017_winter_s2_cloudy/s2_cloudy_55/ROIs2017_winter_s2_cloudy_55_p294.tif",
+      "replacement_test_index": 2,
+      "test_index": 1
+    },
+    {
+      "original_dataset_index": 8228,
+      "original_sample_id": "ROIs2017_winter_s2_cloudy/s2_cloudy_55/ROIs2017_winter_s2_cloudy_55_p294.tif",
+      "replacement_dataset_index": 17847,
+      "replacement_sar_sample_id": "ROIs2017_winter_s2_cloudy/s2_cloudy_146/ROIs2017_winter_s2_cloudy_146_p306.tif",
+      "replacement_test_index": 0,
+      "test_index": 2
+    }
+  ]
+}

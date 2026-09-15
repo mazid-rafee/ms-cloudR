@@ -1,0 +1,19 @@
+{
+  "FID": 31.756464,
+  "L1": 0.011096,
+  "LPIPS": 0.193985,
+  "PSNR": 34.506577,
+  "SAM": 3.348875,
+  "SSIM": 0.896302,
+  "bridge_schedule": "mean_reverting",
+  "checkpoint": "outputs/DBCR_MR_r3_seed42_epochs50_20260812/checkpoints/best.pt",
+  "clear_L1_soft": 0.010816,
+  "clear_SAM_soft": 3.273505,
+  "cloud_L1_soft": 0.01526,
+  "cloud_SAM_soft": 4.477417,
+  "mean_reversion_rate": 3.0,
+  "nfe": 1,
+  "sar_intervention": "normal",
+  "sar_intervention_seed": 123,
+  "seed": 42
+}
