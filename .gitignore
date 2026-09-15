@@ -25,3 +25,5 @@ logs/*.log
 
 # NFS leftover files (deleted-but-still-open on NFS)
 **/.nfs*
+logs/
+outputs/
