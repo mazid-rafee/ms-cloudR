@@ -18,7 +18,7 @@ import torch
 DEFAULT_TEACHER = (
     "outputs/DBCR_MR_r3_seed42_epochs50_20260812/checkpoints/best.pt"
 )
-LAMBDAS = [1e-3, 5e-3, 1e-2, 5e-2, 1e-1]
+DEFAULT_LAMBDAS = [1e-3, 5e-3, 1e-2, 5e-2, 1e-1]
 
 
 def main():
@@ -35,12 +35,23 @@ def main():
     parser.add_argument("--teacher", type=str, default=DEFAULT_TEACHER)
     parser.add_argument("--anchor_t", type=float, default=0.0)
     parser.add_argument(
+        "--lambdas",
+        type=str,
+        default="",
+        help="Comma-separated lambda values (default: full candidate grid).",
+    )
+    parser.add_argument(
         "--output",
         type=str,
         default="outputs/DBCR_MR_r3_SARAlign/lambda_probe.json",
     )
     args = parser.parse_args()
     os.environ["CUDA_VISIBLE_DEVICES"] = args.gpu
+
+    if args.lambdas.strip():
+        LAMBDAS = [float(x.strip()) for x in args.lambdas.split(",") if x.strip()]
+    else:
+        LAMBDAS = list(DEFAULT_LAMBDAS)
 
     from torch.utils.data import DataLoader, Subset
     from src.datasets.sen12mscr_dataset import SEN12MSCRDataset
