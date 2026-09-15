@@ -66,11 +66,41 @@ class NAFBlock(nn.Module):
         return x + y * self.gamma
 
 
+class SARReliabilityGate(nn.Module):
+    """Spatial [B,1,H,W] admission control on the projected SAR residual.
+
+    gate = 2 * sigmoid(logit). Final conv is zero-initialized so that at
+    init logit=0 -> gate=1 and the residual path matches ungated SFBlock.
+    """
+
+    def __init__(self, channels: int):
+        super().__init__()
+        hidden = max(8, channels // 8)
+        self.hidden = hidden
+        self.net = nn.Sequential(
+            nn.Conv2d(3 * channels, hidden, kernel_size=1),
+            nn.GELU(),
+            nn.Conv2d(hidden, 1, kernel_size=3, padding=1),
+        )
+        final = self.net[-1]
+        nn.init.zeros_(final.weight)
+        nn.init.zeros_(final.bias)
+
+    def forward(self, x_opt: torch.Tensor, sar_residual: torch.Tensor) -> torch.Tensor:
+        gate_input = torch.cat(
+            [x_opt, sar_residual, torch.abs(x_opt - sar_residual)],
+            dim=1,
+        )
+        gate_logit = self.net(gate_input)
+        return 2.0 * torch.sigmoid(gate_logit)
+
+
 class SFBlock(nn.Module):
-    def __init__(self, channels, heads):
+    def __init__(self, channels, heads, use_reliability_gate: bool = False):
         super().__init__()
         self.channels = channels
         self.heads = heads
+        self.use_reliability_gate = bool(use_reliability_gate)
         self.q = nn.Conv2d(channels, channels, 1)
         self.k = nn.Conv2d(channels, channels, 1)
         self.v = nn.Conv2d(channels, channels, 1)
@@ -80,6 +110,11 @@ class SFBlock(nn.Module):
             nn.GELU(),
             nn.Conv2d(channels * 2, channels, 1),
         )
+        self.reliability_gate = (
+            SARReliabilityGate(channels) if self.use_reliability_gate else None
+        )
+        # Populated during forward when the gate is enabled (eval/logging).
+        self.last_gate = None
 
     def forward(self, x_opt, x_sar):
         b, c, h, w = x_opt.shape
@@ -93,7 +128,19 @@ class SFBlock(nn.Module):
             dim=-1,
         )
         fused = torch.einsum("bhcn,bhcd->bhdn", v, attn).reshape(b, c, h, w)
-        out = x_opt + self.proj(fused)
+        sar_residual = self.proj(fused)
+        if self.reliability_gate is not None:
+            gate = self.reliability_gate(x_opt, sar_residual)
+            # Keep the live gate for the residual (fully differentiable).
+            # Cache only a detached copy outside training for eval/debug stats.
+            if not self.training:
+                self.last_gate = gate.detach()
+            else:
+                self.last_gate = None
+            out = x_opt + gate * sar_residual
+        else:
+            self.last_gate = None
+            out = x_opt + sar_residual
         out = out + self.mlp(out)
         return out
 
@@ -108,8 +155,12 @@ class DBCRNet(nn.Module):
         dec_blocks=(1, 1, 1, 1),
         heads=(1, 1, 2, 4),
         time_dim=128,
+        sar_reliability_gate: bool = False,
     ):
         super().__init__()
+        self.sar_reliability_gate = bool(sar_reliability_gate)
+        self.widths = tuple(widths)
+        self.heads = tuple(heads)
         self.time_mlp = nn.Sequential(
             SinusoidalTimeEmbedding(time_dim),
             nn.Linear(time_dim, time_dim * 4),
@@ -131,7 +182,9 @@ class DBCRNet(nn.Module):
         for i, c in enumerate(widths):
             self.opt_enc.append(nn.Sequential(*[NAFBlock(c) for _ in range(enc_blocks[i])]))
             self.sar_enc.append(nn.Sequential(*[NAFBlock(c) for _ in range(enc_blocks[i])]))
-            self.fuse.append(SFBlock(c, heads[i]))
+            self.fuse.append(
+                SFBlock(c, heads[i], use_reliability_gate=self.sar_reliability_gate)
+            )
             if i < len(widths) - 1:
                 self.downs.append(nn.Conv2d(c, widths[i + 1], 2, stride=2))
 
@@ -174,6 +227,37 @@ class DBCRNet(nn.Module):
             opt = self.opt_dec[i](opt)
 
         return self.head(opt)
+
+
+def summarize_gate_map(gate: torch.Tensor) -> dict:
+    """Aggregate statistics for one [B,1,H,W] (or broadcastable) gate map."""
+    g = gate.detach().float().reshape(-1)
+    return {
+        "gate_mean": float(g.mean()),
+        "gate_std": float(g.std(unbiased=False)),
+        "gate_min": float(g.min()),
+        "gate_max": float(g.max()),
+        "frac_lt_0.5": float((g < 0.5).float().mean()),
+        "frac_lt_0.8": float((g < 0.8).float().mean()),
+        "frac_gt_1.2": float((g > 1.2).float().mean()),
+        "frac_gt_1.5": float((g > 1.5).float().mean()),
+        "numel": int(g.numel()),
+    }
+
+
+def collect_sfblock_gate_stats(model: nn.Module) -> dict:
+    """Read last_gate from each SFBlock after a forward (eval-only logging)."""
+    out = {}
+    fuse = getattr(model, "fuse", None)
+    if fuse is None:
+        return out
+    for i, block in enumerate(fuse):
+        gate = getattr(block, "last_gate", None)
+        if gate is None:
+            continue
+        out[f"fuse[{i}]"] = summarize_gate_map(gate)
+        out[f"fuse[{i}]"]["shape"] = list(gate.shape)
+    return out
 
 
 def alpha_schedule(t, T):

@@ -1,0 +1,6 @@
+2026-09-14 22:27:10,187 | INFO | device=cuda gpu=5
+2026-09-14 22:27:10,187 | INFO | ReliabilityGate 3-epoch pilot seed=42 MR_r3 rate=3.0 from_scratch
+2026-09-14 22:27:35,901 | INFO | split train/val/test=97773/12221/12223
+2026-09-14 22:27:41,890 | INFO | trainable_params=13605239 gate_params=16598
+2026-09-14 22:27:42,959 | INFO | train-mode last_gate cleared: OK
+Train 1 [50/24444] loss=0.192160Train 1 [100/24444] loss=0.093528Train 1 [150/24444] loss=0.092302Train 1 [200/24444] loss=0.058181Train 1 [250/24444] loss=0.056754Train 1 [300/24444] loss=0.062090Train 1 [350/24444] loss=0.062876Train 1 [400/24444] loss=0.066285Train 1 [450/24444] loss=0.040985Train 1 [500/24444] loss=0.060522

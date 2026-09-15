@@ -1,0 +1,11 @@
+{
+  "model": "dbcr",
+  "batch_size": 4,
+  "epochs": 50,
+  "lr": 5e-5,
+  "diffusion_steps": 1000,
+  "nfe": 1,
+  "bridge_schedule": "mean_reverting",
+  "mean_reversion_rate": 3.0,
+  "sar_reliability_gate": true
+}

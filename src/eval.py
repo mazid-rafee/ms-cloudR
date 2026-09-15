@@ -81,6 +81,19 @@ def parse_args():
         default="",
         help="Optional parent directory for shuffle mapping / noise statistics JSON.",
     )
+    parser.add_argument(
+        "--sar_reliability_gate",
+        action="store_true",
+        help="Load/build DBCRNet with spatial SAR reliability gates enabled.",
+    )
+    parser.add_argument(
+        "--log_gate_stats",
+        action="store_true",
+        help=(
+            "If the model has reliability gates, aggregate per-level gate "
+            "statistics during eval (does not change predictions)."
+        ),
+    )
     args = parser.parse_args()
     defaults = {k: parser.get_default(k) for k in vars(args)}
     return args, defaults
@@ -254,10 +267,17 @@ def run_eval(args, defaults=None):
     model_cls = get_model(args.model)
     if args.model != "dbcr":
         raise NotImplementedError("Only DB-CR is wired into the eval loop right now.")
-    model = model_cls().to(device)
+    model = model_cls(
+        sar_reliability_gate=bool(getattr(args, "sar_reliability_gate", False))
+    ).to(device)
     load_checkpoint(args.checkpoint, model, optimizer=None, map_location=device)
 
     model.eval()
+    logger.info(
+        "sar_reliability_gate=%s log_gate_stats=%s",
+        bool(getattr(args, "sar_reliability_gate", False)),
+        bool(getattr(args, "log_gate_stats", False)),
+    )
     test_l1 = 0.0
     test_psnr = 0.0
     test_ssim = 0.0
@@ -290,6 +310,29 @@ def run_eval(args, defaults=None):
     except Exception as exc:
         logger.warning("FID not available: %s", exc)
     wrapped_batches = hasattr(test_ds, "mode")
+    gate_accum = None
+    log_gate_stats = bool(getattr(args, "log_gate_stats", False)) and bool(
+        getattr(args, "sar_reliability_gate", False)
+    )
+    if log_gate_stats:
+        from src.models.dbcr import collect_sfblock_gate_stats
+
+        gate_accum = {
+            f"fuse[{i}]": {
+                "sum_mean": 0.0,
+                "sum_std": 0.0,
+                "min": float("inf"),
+                "max": float("-inf"),
+                "sum_frac_lt_0.5": 0.0,
+                "sum_frac_lt_0.8": 0.0,
+                "sum_frac_gt_1.2": 0.0,
+                "sum_frac_gt_1.5": 0.0,
+                "n": 0,
+            }
+            for i in range(len(model.fuse))
+        }
+        logger.info("Gate statistics logging ON (eval-only; predictions unchanged).")
+
     with torch.no_grad():
         for step, batch in enumerate(test_loader, start=1):
             if wrapped_batches:
@@ -313,6 +356,22 @@ def run_eval(args, defaults=None):
                 x0_hat = model(x_t, t_curr.repeat(x_t.size(0)), z)
                 x_t = (1 - alpha_next / alpha_curr) * x0_hat + (alpha_next / alpha_curr) * x_t
 
+            if gate_accum is not None:
+                stats = collect_sfblock_gate_stats(model)
+                for key, rec in stats.items():
+                    if key not in gate_accum:
+                        continue
+                    acc = gate_accum[key]
+                    acc["sum_mean"] += rec["gate_mean"]
+                    acc["sum_std"] += rec["gate_std"]
+                    acc["min"] = min(acc["min"], rec["gate_min"])
+                    acc["max"] = max(acc["max"], rec["gate_max"])
+                    acc["sum_frac_lt_0.5"] += rec["frac_lt_0.5"]
+                    acc["sum_frac_lt_0.8"] += rec["frac_lt_0.8"]
+                    acc["sum_frac_gt_1.2"] += rec["frac_gt_1.2"]
+                    acc["sum_frac_gt_1.5"] += rec["frac_gt_1.5"]
+                    acc["n"] += 1
+                    acc["shape"] = rec["shape"]
             test_l1 += torch.mean(torch.abs(x0_hat - x0)).item()
             test_psnr += psnr(x0_hat, x0).item()
             test_ssim += ssim(x0_hat, x0).item()
@@ -487,6 +546,35 @@ def run_eval(args, defaults=None):
             per_sample_rows,
             fieldnames,
         )
+    if gate_accum is not None:
+        gate_summary = {}
+        for key, acc in gate_accum.items():
+            n = max(1, acc["n"])
+            gate_summary[key] = {
+                "gate_mean": round(acc["sum_mean"] / n, 6),
+                "gate_std": round(acc["sum_std"] / n, 6),
+                "gate_min": round(acc["min"], 6) if acc["min"] != float("inf") else None,
+                "gate_max": round(acc["max"], 6) if acc["max"] != float("-inf") else None,
+                "frac_lt_0.5": round(acc["sum_frac_lt_0.5"] / n, 6),
+                "frac_lt_0.8": round(acc["sum_frac_lt_0.8"] / n, 6),
+                "frac_gt_1.2": round(acc["sum_frac_gt_1.2"] / n, 6),
+                "frac_gt_1.5": round(acc["sum_frac_gt_1.5"] / n, 6),
+                "n_batches": acc["n"],
+                "shape": acc.get("shape"),
+            }
+            logger.info(
+                "Gate %s mean=%.4f std=%.4f min=%.4f max=%.4f",
+                key,
+                gate_summary[key]["gate_mean"],
+                gate_summary[key]["gate_std"],
+                gate_summary[key]["gate_min"],
+                gate_summary[key]["gate_max"],
+            )
+        results["gate_stats"] = gate_summary
+        save_json(os.path.join(run_dir, "gate_stats.json"), gate_summary)
+        # rewrite eval_metrics with gate_stats included
+        save_json(os.path.join(run_dir, "eval_metrics.json"), results)
+
     logger.info("Eval L1: %.6f | PSNR: %.4f | SSIM: %.4f", test_l1, test_psnr, test_ssim)
     logger.info("Eval SAM(deg): %.4f", test_sam)
     if lpips_model is not None:

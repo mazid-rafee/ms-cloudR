@@ -42,6 +42,14 @@ def parse_args():
     parser.add_argument("--num_save_images", type=int, default=4)
     parser.add_argument("--subset_frac", type=float, default=1.0)
     parser.add_argument("--subset_max", type=int, default=0)
+    parser.add_argument(
+        "--sar_reliability_gate",
+        action="store_true",
+        help=(
+            "Enable spatial [B,1,H,W] reliability gate on SFBlock projected "
+            "SAR residual. Default off preserves DBCR_MR_r3."
+        ),
+    )
     args = parser.parse_args()
     defaults = {k: parser.get_default(k) for k in vars(args)}
     return args, defaults
@@ -158,9 +166,15 @@ def main():
     model_cls = get_model(args.model)
     if args.model != "dbcr":
         raise NotImplementedError("Only DB-CR is wired into the training loop right now.")
-    model = model_cls().to(device)
+    model = model_cls(
+        sar_reliability_gate=bool(getattr(args, "sar_reliability_gate", False))
+    ).to(device)
     n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
     logger.info("trainable_parameters=%d", n_params)
+    logger.info(
+        "sar_reliability_gate=%s",
+        bool(getattr(args, "sar_reliability_gate", False)),
+    )
     opt = torch.optim.Adam(model.parameters(), lr=args.lr)
 
     start_epoch = 1
@@ -189,6 +203,9 @@ def main():
             "model": args.model,
             "config": args.config,
             "trainable_parameters": n_params,
+            "sar_reliability_gate": bool(
+                getattr(args, "sar_reliability_gate", False)
+            ),
             "split_sizes": {
                 "train": train_size,
                 "val": val_size,

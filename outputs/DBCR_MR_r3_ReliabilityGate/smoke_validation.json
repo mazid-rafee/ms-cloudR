@@ -1,0 +1,201 @@
+{
+  "checks": {
+    "ungated_forward_ok": true,
+    "gate_shapes_correct": true,
+    "gates_are_one_at_init": true,
+    "gated_matches_baseline_at_init": true,
+    "gate_inputs_are_x_opt_and_sar_residual_only": true,
+    "backprop_reaches_gate": true,
+    "mr_r3_config_untouched": true,
+    "new_config_enables_gate": true,
+    "new_config_is_mean_reverting": true
+  },
+  "baseline_params": 13588641,
+  "gated_params": 13605239,
+  "param_increase": 16598,
+  "param_increase_pct": 0.12214613661513318,
+  "per_level_gate_params": [
+    {
+      "fuse": 0,
+      "channels": 22,
+      "heads": 1,
+      "gate_params": 609,
+      "hidden": 8
+    },
+    {
+      "fuse": 1,
+      "channels": 44,
+      "heads": 1,
+      "gate_params": 1137,
+      "hidden": 8
+    },
+    {
+      "fuse": 2,
+      "channels": 88,
+      "heads": 2,
+      "gate_params": 3015,
+      "hidden": 11
+    },
+    {
+      "fuse": 3,
+      "channels": 176,
+      "heads": 4,
+      "gate_params": 11837,
+      "hidden": 22
+    }
+  ],
+  "gate_shapes": {
+    "fuse[0]": [
+      2,
+      1,
+      256,
+      256
+    ],
+    "fuse[1]": [
+      2,
+      1,
+      128,
+      128
+    ],
+    "fuse[2]": [
+      2,
+      1,
+      64,
+      64
+    ],
+    "fuse[3]": [
+      2,
+      1,
+      32,
+      32
+    ]
+  },
+  "gate_minmax_at_init": {
+    "fuse[0]": {
+      "min": 1.0,
+      "mean": 1.0,
+      "max": 1.0
+    },
+    "fuse[1]": {
+      "min": 1.0,
+      "mean": 1.0,
+      "max": 1.0
+    },
+    "fuse[2]": {
+      "min": 1.0,
+      "mean": 1.0,
+      "max": 1.0
+    },
+    "fuse[3]": {
+      "min": 1.0,
+      "mean": 1.0,
+      "max": 1.0
+    }
+  },
+  "n_shared_tensors_copied": 1266,
+  "baseline_vs_gated_init_max_abs_diff": 0.0,
+  "baseline_vs_gated_init_mean_abs_diff": 0.0,
+  "notes": [
+    "SARReliabilityGate.forward(x_opt, sar_residual) concatenates x_opt, sar_residual, |x_opt-sar_residual|; clean x0 is never an argument.",
+    "DBCRNet.forward(x_t, t, z) never receives x0."
+  ],
+  "gate_grad_probe": [
+    {
+      "fuse": 0,
+      "param": "net.0.weight",
+      "grad_abs_mean": 0.0,
+      "has_grad": true
+    },
+    {
+      "fuse": 0,
+      "param": "net.0.bias",
+      "grad_abs_mean": 0.0,
+      "has_grad": true
+    },
+    {
+      "fuse": 0,
+      "param": "net.2.weight",
+      "grad_abs_mean": 0.0007355075795203447,
+      "has_grad": true
+    },
+    {
+      "fuse": 0,
+      "param": "net.2.bias",
+      "grad_abs_mean": 0.017984282225370407,
+      "has_grad": true
+    },
+    {
+      "fuse": 1,
+      "param": "net.0.weight",
+      "grad_abs_mean": 0.0,
+      "has_grad": true
+    },
+    {
+      "fuse": 1,
+      "param": "net.0.bias",
+      "grad_abs_mean": 0.0,
+      "has_grad": true
+    },
+    {
+      "fuse": 1,
+      "param": "net.2.weight",
+      "grad_abs_mean": 8.842450915835798e-05,
+      "has_grad": true
+    },
+    {
+      "fuse": 1,
+      "param": "net.2.bias",
+      "grad_abs_mean": 0.0012262158561497927,
+      "has_grad": true
+    },
+    {
+      "fuse": 2,
+      "param": "net.0.weight",
+      "grad_abs_mean": 0.0,
+      "has_grad": true
+    },
+    {
+      "fuse": 2,
+      "param": "net.0.bias",
+      "grad_abs_mean": 0.0,
+      "has_grad": true
+    },
+    {
+      "fuse": 2,
+      "param": "net.2.weight",
+      "grad_abs_mean": 1.3397657312452793e-05,
+      "has_grad": true
+    },
+    {
+      "fuse": 2,
+      "param": "net.2.bias",
+      "grad_abs_mean": 0.00044668003101833165,
+      "has_grad": true
+    },
+    {
+      "fuse": 3,
+      "param": "net.0.weight",
+      "grad_abs_mean": 0.0,
+      "has_grad": true
+    },
+    {
+      "fuse": 3,
+      "param": "net.0.bias",
+      "grad_abs_mean": 0.0,
+      "has_grad": true
+    },
+    {
+      "fuse": 3,
+      "param": "net.2.weight",
+      "grad_abs_mean": 1.9682615004512627e-07,
+      "has_grad": true
+    },
+    {
+      "fuse": 3,
+      "param": "net.2.bias",
+      "grad_abs_mean": 5.915001565881539e-06,
+      "has_grad": true
+    }
+  ],
+  "failed": []
+}
