@@ -237,10 +237,13 @@ def summarize_gate_map(gate: torch.Tensor) -> dict:
         "gate_std": float(g.std(unbiased=False)),
         "gate_min": float(g.min()),
         "gate_max": float(g.max()),
+        "mean_abs_dev_from_1": float(torch.mean(torch.abs(g - 1.0))),
         "frac_lt_0.5": float((g < 0.5).float().mean()),
         "frac_lt_0.8": float((g < 0.8).float().mean()),
         "frac_gt_1.2": float((g > 1.2).float().mean()),
         "frac_gt_1.5": float((g > 1.5).float().mean()),
+        "has_nan": bool(torch.isnan(g).any()),
+        "has_inf": bool(torch.isinf(g).any()),
         "numel": int(g.numel()),
     }
 
