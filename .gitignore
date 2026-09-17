@@ -16,12 +16,14 @@ data/
 work_dirs/
 src/results/*.pth
 results/*.pth
+
 # Ignore generated experiment logs
 outputs/**/*.log
 outputs/*.log
 logs/**/*.log
 logs/*.log
 
+# NFS leftover files (deleted-but-still-open on NFS)
 **/.nfs*
 logs/
 outputs/
