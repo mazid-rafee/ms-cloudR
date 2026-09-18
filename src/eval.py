@@ -32,6 +32,17 @@ def parse_args():
         default=3.0,
         help="Rate for mean_reverting bridge schedule (ignored if original).",
     )
+    parser.add_argument(
+        "--spectral_mean_reversion_rates",
+        type=float,
+        nargs=13,
+        default=None,
+        help=(
+            "Optional 13 band-wise mean-reversion rates for a spectrally "
+            "anisotropic mean-reverting bridge. When set, overrides "
+            "--mean_reversion_rate. Requires --bridge_schedule mean_reverting."
+        ),
+    )
     parser.add_argument("--checkpoint", type=str, required=True)
     parser.add_argument("--output_dir", type=str, default="outputs")
     parser.add_argument("--run_name", type=str, default="eval")
@@ -185,7 +196,7 @@ def run_eval(args, defaults=None):
     import torch
     from torch.utils.data import DataLoader, random_split, Subset
     from src.datasets.sen12mscr_dataset import SEN12MSCRDataset
-    from src.models.dbcr import get_alpha_schedule
+    from src.models.dbcr import get_alpha_schedule, reshape_alpha_for_broadcast
     from src.models.registry import get_model
     from src.utils.checkpoint import load_checkpoint
     from src.utils.io_utils import save_json
@@ -201,10 +212,15 @@ def run_eval(args, defaults=None):
     if device == "cuda":
         logger.info("GPU: %s", torch.cuda.get_device_name(0))
     logger.info("seed=%s sar_intervention_seed=%s", args.seed, args.sar_intervention_seed)
+    spectral_rates = args.spectral_mean_reversion_rates
+    if spectral_rates is not None:
+        spectral_rates = [float(r) for r in spectral_rates]
     logger.info(
-        "Bridge schedule: %s (mean_reversion_rate=%s) nfe=%s sar_intervention=%s",
+        "Bridge schedule: %s (mean_reversion_rate=%s spectral_mean_reversion_rates=%s) "
+        "nfe=%s sar_intervention=%s",
         args.bridge_schedule,
         args.mean_reversion_rate,
+        spectral_rates,
         args.nfe,
         args.sar_intervention,
     )
@@ -212,6 +228,7 @@ def run_eval(args, defaults=None):
     alpha_fn = get_alpha_schedule(
         bridge_schedule=args.bridge_schedule,
         mean_reversion_rate=args.mean_reversion_rate,
+        spectral_mean_reversion_rates=spectral_rates,
     )
 
     seasons = parse_seasons(args.seasons)
@@ -308,8 +325,12 @@ def run_eval(args, defaults=None):
             for k in range(args.nfe):
                 t_curr = timesteps[k]
                 t_next = timesteps[k + 1]
-                alpha_curr = alpha_fn(t_curr.float(), T).view(1, 1, 1, 1)
-                alpha_next = alpha_fn(t_next.float(), T).view(1, 1, 1, 1)
+                alpha_curr = reshape_alpha_for_broadcast(
+                    alpha_fn(t_curr.float(), T), as_channels=True
+                )
+                alpha_next = reshape_alpha_for_broadcast(
+                    alpha_fn(t_next.float(), T), as_channels=True
+                )
                 x0_hat = model(x_t, t_curr.repeat(x_t.size(0)), z)
                 x_t = (1 - alpha_next / alpha_curr) * x0_hat + (alpha_next / alpha_curr) * x_t
 
@@ -421,6 +442,7 @@ def run_eval(args, defaults=None):
         "eval_ssim": round(test_ssim, 6),
         "bridge_schedule": args.bridge_schedule,
         "mean_reversion_rate": args.mean_reversion_rate,
+        "spectral_mean_reversion_rates": spectral_rates,
     }
     if args.write_intervention_artifacts or args.sar_intervention != "normal":
         results.update(
@@ -458,6 +480,7 @@ def run_eval(args, defaults=None):
             "sar_intervention": args.sar_intervention,
             "bridge_schedule": args.bridge_schedule,
             "mean_reversion_rate": args.mean_reversion_rate,
+            "spectral_mean_reversion_rates": spectral_rates,
             "nfe": args.nfe,
             "seed": args.seed,
             "sar_intervention_seed": args.sar_intervention_seed,

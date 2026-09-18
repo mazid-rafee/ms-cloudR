@@ -176,9 +176,39 @@ class DBCRNet(nn.Module):
         return self.head(opt)
 
 
+# Sentinel-2 optical channel count used by spectral mean-reverting bridges.
+NUM_S2_BANDS = 13
+
+
 def alpha_schedule(t, T):
     """Original DB-CR sinusoidal bridge schedule. alpha(0)=0, alpha(T)=1."""
     return torch.sin((t / T) * math.pi / 2)
+
+
+def _as_rate_tensor(rate, *, dtype, device):
+    """Normalize rate to a 0-D (scalar) or 1-D (spectral) float tensor."""
+    if torch.is_tensor(rate):
+        rate_t = rate.detach().to(dtype=dtype, device=device).float().reshape(-1)
+    elif isinstance(rate, (list, tuple)):
+        rate_t = torch.as_tensor(list(rate), dtype=dtype, device=device).float().reshape(-1)
+    else:
+        rate_t = torch.as_tensor(float(rate), dtype=dtype, device=device).float().reshape(-1)
+
+    if rate_t.numel() == 1:
+        if float(rate_t.item()) <= 0.0:
+            raise ValueError(f"mean_reversion_rate must be > 0, got {float(rate_t.item())}")
+        return rate_t.reshape(())  # 0-D scalar tensor
+
+    if rate_t.numel() != NUM_S2_BANDS:
+        raise ValueError(
+            f"spectral mean_reversion rates must have length {NUM_S2_BANDS}, "
+            f"got {rate_t.numel()}"
+        )
+    if bool((rate_t <= 0).any().item()):
+        raise ValueError(
+            f"all spectral mean_reversion rates must be > 0, got {rate_t.tolist()}"
+        )
+    return rate_t  # [13]
 
 
 def mean_reverting_alpha_schedule(t, T, rate=3.0):
@@ -191,26 +221,100 @@ def mean_reverting_alpha_schedule(t, T, rate=3.0):
     Args:
         t: scalar or tensor timesteps (same device as returned alpha).
         T: total diffusion steps (positive scalar).
-        rate: mean-reversion rate; must be > 0.
+        rate: mean-reversion rate; must be > 0. Either a scalar or a length-13
+            vector (list/tuple/1D tensor) for spectrally anisotropic schedules.
+
+    Returns:
+        Scalar path (scalar rate):
+            * t shaped [B] -> alpha shaped [B]
+            * t scalar / 0-D -> alpha scalar / 0-D
+        Spectral path (length-13 rate):
+            * t shaped [B] -> alpha shaped [B, 13]
+            * t scalar / 0-D -> alpha shaped [13]
     """
     if not torch.is_tensor(t):
         t = torch.as_tensor(t, dtype=torch.float32)
     t = t.float()
 
-    rate_val = float(rate.detach().item() if torch.is_tensor(rate) else rate)
-    if rate_val <= 0.0:
-        raise ValueError(f"mean_reversion_rate must be > 0, got {rate_val}")
+    rate_t = _as_rate_tensor(rate, dtype=t.dtype, device=t.device)
 
+    # Scalar path: preserve historical broadcasting (rate is 0-D).
+    if rate_t.ndim == 0:
+        s = t / float(T)
+        # expm1 improves accuracy for small rate; mathematically equal to
+        # (1 - exp(-rate * s)) / (1 - exp(-rate)).
+        return torch.expm1(-rate_t * s) / torch.expm1(-rate_t)
+
+    # Spectral path: rate_t is [13].
     s = t / float(T)
-    rate_t = torch.as_tensor(rate_val, dtype=t.dtype, device=t.device)
-    # expm1 improves accuracy for small rate; mathematically equal to
-    # (1 - exp(-rate * s)) / (1 - exp(-rate)).
-    return torch.expm1(-rate_t * s) / torch.expm1(-rate_t)
+    if t.ndim == 0:
+        # s scalar, rate [13] -> alpha [13]
+        return torch.expm1(-rate_t * s) / torch.expm1(-rate_t)
+    # s [B] -> [B, 1], rate [13] -> alpha [B, 13]
+    s = s.reshape(-1, 1)
+    return torch.expm1(-rate_t.unsqueeze(0) * s) / torch.expm1(-rate_t)
 
 
-def get_alpha_schedule(bridge_schedule="original", mean_reversion_rate=3.0):
-    """Return the alpha(t, T) callable for the selected bridge schedule."""
+def reshape_alpha_for_broadcast(alpha, *, as_channels: bool = False):
+    """Reshape schedule output for broadcasting against [B, C, H, W].
+
+    Supported mappings:
+      * 0-D            -> [1, 1, 1, 1]     (scalar inference)
+      * 1-D [B]        -> [B, 1, 1, 1]     (scalar train; as_channels=False)
+      * 1-D [C]        -> [1, C, 1, 1]     (spectral inference; as_channels=True)
+      * 2-D [B, C]     -> [B, C, 1, 1]     (spectral train)
+
+    ``as_channels`` disambiguates 1-D tensors: use True only for spectral
+    alpha produced from a scalar timestep (inference / reverse).
+    """
+    if not torch.is_tensor(alpha):
+        alpha = torch.as_tensor(alpha)
+    if alpha.ndim == 0:
+        return alpha.reshape(1, 1, 1, 1)
+    if alpha.ndim == 2:
+        return alpha.unsqueeze(-1).unsqueeze(-1)
+    if alpha.ndim == 1:
+        if as_channels:
+            return alpha.reshape(1, -1, 1, 1)
+        return alpha.reshape(-1, 1, 1, 1)
+    raise ValueError(
+        f"reshape_alpha_for_broadcast expects 0-D, 1-D, or 2-D alpha, got shape {tuple(alpha.shape)}"
+    )
+
+
+def get_alpha_schedule(
+    bridge_schedule="original",
+    mean_reversion_rate=3.0,
+    spectral_mean_reversion_rates=None,
+):
+    """Return the alpha(t, T) callable for the selected bridge schedule.
+
+    If ``spectral_mean_reversion_rates`` is provided, it must be a length-13
+    sequence of positive rates and ``bridge_schedule`` must be
+    ``\"mean_reverting\"``. The spectral vector then overrides the scalar
+    ``mean_reversion_rate``. When absent, scalar behavior is unchanged.
+    """
     name = str(bridge_schedule).lower().replace("-", "_")
+    if spectral_mean_reversion_rates is not None:
+        if name != "mean_reverting":
+            raise ValueError(
+                "spectral_mean_reversion_rates requires bridge_schedule='mean_reverting'"
+            )
+        rates = list(spectral_mean_reversion_rates)
+        if len(rates) != NUM_S2_BANDS:
+            raise ValueError(
+                f"spectral_mean_reversion_rates must have length {NUM_S2_BANDS}, got {len(rates)}"
+            )
+        if any(float(r) <= 0.0 for r in rates):
+            raise ValueError(
+                f"all spectral_mean_reversion_rates must be > 0, got {rates}"
+            )
+
+        def spectral_schedule(t, T):
+            return mean_reverting_alpha_schedule(t, T, rate=rates)
+
+        return spectral_schedule
+
     if name == "original":
         return alpha_schedule
     if name == "mean_reverting":

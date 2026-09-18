@@ -1,0 +1,25 @@
+{
+  "model": "dbcr",
+  "batch_size": 4,
+  "epochs": 50,
+  "lr": 5e-5,
+  "diffusion_steps": 1000,
+  "nfe": 1,
+  "bridge_schedule": "mean_reverting",
+  "mean_reversion_rate": 3.0,
+  "spectral_mean_reversion_rates": [
+    4.0,
+    4.0,
+    4.0,
+    3.0,
+    3.0,
+    3.0,
+    3.0,
+    3.0,
+    3.0,
+    3.0,
+    3.0,
+    2.0,
+    2.0
+  ]
+}
