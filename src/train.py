@@ -53,6 +53,19 @@ def parse_args():
     parser.add_argument("--num_save_images", type=int, default=4)
     parser.add_argument("--subset_frac", type=float, default=1.0)
     parser.add_argument("--subset_max", type=int, default=0)
+    parser.add_argument(
+        "--skip_test",
+        action="store_true",
+        help="Skip held-out test evaluation after training (pilots / ablation).",
+    )
+    parser.add_argument(
+        "--val_endpoint",
+        action="store_true",
+        help=(
+            "Also report validation L1 at the cloudy endpoint t=T "
+            "(x_t=y), in addition to the existing random-t val L1."
+        ),
+    )
     args = parser.parse_args()
     defaults = {k: parser.get_default(k) for k in vars(args)}
     return args, defaults
@@ -100,6 +113,14 @@ def main():
     if device == "cuda":
         logger.info("GPU: %s", torch.cuda.get_device_name(0))
     logger.info("seed=%s", args.seed)
+    logger.info(
+        "lr=%s batch_size=%s epochs=%s skip_test=%s val_endpoint=%s",
+        args.lr,
+        args.batch_size,
+        args.epochs,
+        args.skip_test,
+        args.val_endpoint,
+    )
     spectral_rates = args.spectral_mean_reversion_rates
     if spectral_rates is not None:
         spectral_rates = [float(r) for r in spectral_rates]
@@ -119,7 +140,9 @@ def main():
     seasons = parse_seasons(args.seasons)
     logger.info("Building dataset...")
     dataset = SEN12MSCRDataset(base_dir=args.data_dir, seasons=seasons)
+    n_invalid = len(getattr(dataset, "ignore_set", set()))
     logger.info("Dataset size: %d samples", len(dataset))
+    logger.info("invalid_files_excluded=%d", n_invalid)
     if len(dataset) == 0:
         logger.error("No samples found. Check dataset paths and file naming.")
         return
@@ -148,6 +171,8 @@ def main():
         len(val_ds),
         len(test_ds)
     )
+    if args.skip_test:
+        logger.info("skip_test=True: held-out test set will not be evaluated.")
 
     train_loader = DataLoader(
         train_ds,
@@ -163,13 +188,19 @@ def main():
         num_workers=args.num_workers,
         pin_memory=True
     )
-    test_loader = DataLoader(
-        test_ds,
-        batch_size=args.batch_size,
-        shuffle=False,
-        num_workers=args.num_workers,
-        pin_memory=True
-    )
+    test_loader = None
+    if not args.skip_test:
+        test_loader = DataLoader(
+            test_ds,
+            batch_size=args.batch_size,
+            shuffle=False,
+            num_workers=args.num_workers,
+            pin_memory=True
+        )
+    else:
+        # Keep split sizes in metadata, but do not wrap/iterate the test subset.
+        del test_ds
+        test_ds = None
 
     model_cls = get_model(args.model)
     if args.model != "dbcr":
@@ -205,7 +236,10 @@ def main():
             "run_name": run_name,
             "model": args.model,
             "config": args.config,
+            "skip_test": args.skip_test,
+            "val_endpoint": args.val_endpoint,
             "trainable_parameters": n_params,
+            "invalid_files_excluded": n_invalid,
             "split_sizes": {
                 "train": train_size,
                 "val": val_size,
@@ -230,6 +264,14 @@ def main():
             x_t = (1 - alpha_t) * x0 + alpha_t * y
             x0_hat = model(x_t, t, z)
             loss = torch.mean(torch.abs(x0_hat - x0))
+            if not torch.isfinite(loss):
+                logger.error(
+                    "Non-finite train loss at epoch=%s step=%s: %s",
+                    epoch,
+                    step,
+                    float(loss.detach().cpu()),
+                )
+                raise RuntimeError("Non-finite train loss")
 
             opt.zero_grad()
             loss.backward()
@@ -243,9 +285,11 @@ def main():
         train_loss /= max(1, len(train_loader))
 
         val_loss = None
+        val_endpoint_l1 = None
         if len(val_loader) > 0:
             model.eval()
             val_total = 0.0
+            val_endpoint_total = 0.0
             with torch.no_grad():
                 for step, (y, z, x0) in enumerate(val_loader, start=1):
                     y = y.to(device)
@@ -259,22 +303,68 @@ def main():
                     x_t = (1 - alpha_t) * x0 + alpha_t * y
                     x0_hat = model(x_t, t, z)
                     loss = torch.mean(torch.abs(x0_hat - x0))
+                    if not torch.isfinite(loss):
+                        logger.error(
+                            "Non-finite val loss at epoch=%s step=%s: %s",
+                            epoch,
+                            step,
+                            float(loss.detach().cpu()),
+                        )
+                        raise RuntimeError("Non-finite validation loss")
                     val_total += loss.item()
+
+                    if args.val_endpoint:
+                        # Cloudy endpoint t=T => alpha=1 => x_t = y.
+                        t_end = torch.full(
+                            (x0.size(0),),
+                            args.diffusion_steps,
+                            device=device,
+                            dtype=torch.long,
+                        )
+                        alpha_end = reshape_alpha_for_broadcast(
+                            alpha_fn(t_end.float(), args.diffusion_steps)
+                        )
+                        x_end = (1 - alpha_end) * x0 + alpha_end * y
+                        x0_hat_end = model(x_end, t_end, z)
+                        end_loss = torch.mean(torch.abs(x0_hat_end - x0))
+                        if not torch.isfinite(end_loss):
+                            raise RuntimeError("Non-finite validation endpoint loss")
+                        val_endpoint_total += end_loss.item()
 
                     if step % args.log_every == 0 or step == len(val_loader):
                         progress_bar(f"Val {epoch}", step, len(val_loader))
             sys.stdout.write("\n")
             val_loss = val_total / max(1, len(val_loader))
+            if args.val_endpoint:
+                val_endpoint_l1 = val_endpoint_total / max(1, len(val_loader))
 
         metrics_row = {
             "epoch": epoch,
             "train_loss": round(train_loss, 6),
-            "val_loss": round(val_loss, 6) if val_loss is not None else ""
+            "val_loss": round(val_loss, 6) if val_loss is not None else "",
+            "val_random_t_l1": round(val_loss, 6) if val_loss is not None else "",
+            "val_endpoint_l1": (
+                round(val_endpoint_l1, 6) if val_endpoint_l1 is not None else ""
+            ),
+            "lr": args.lr,
         }
-        append_metrics_csv(metrics_csv, metrics_row, header=["epoch", "train_loss", "val_loss"])
-        logger.info("Train loss: %.6f", train_loss)
+        append_metrics_csv(
+            metrics_csv,
+            metrics_row,
+            header=[
+                "epoch",
+                "train_loss",
+                "val_loss",
+                "val_random_t_l1",
+                "val_endpoint_l1",
+                "lr",
+            ],
+        )
+        logger.info("Train loss: %.6f | lr=%s", train_loss, args.lr)
         if val_loss is not None:
-            logger.info("Val loss: %.6f", val_loss)
+            logger.info("Val random-t L1: %.6f", val_loss)
+        if val_endpoint_l1 is not None:
+            logger.info("Val endpoint L1 (t=T): %.6f", val_endpoint_l1)
 
         if val_loss is not None and (best_val is None or val_loss < best_val):
             best_val = val_loss
@@ -285,6 +375,7 @@ def main():
                 epoch,
                 extra={
                     "best_val": best_val,
+                    "best_val_endpoint_l1": val_endpoint_l1,
                     "bridge_schedule": args.bridge_schedule,
                     "mean_reversion_rate": args.mean_reversion_rate,
                     "spectral_mean_reversion_rates": spectral_rates,
@@ -293,7 +384,9 @@ def main():
 
     logger.info("Training complete.")
 
-    if len(test_loader) > 0:
+    if args.skip_test:
+        logger.info("Skipping held-out test evaluation (--skip_test).")
+    elif test_loader is not None and len(test_loader) > 0:
         logger.info("Starting test...")
         model.eval()
         test_l1 = 0.0
